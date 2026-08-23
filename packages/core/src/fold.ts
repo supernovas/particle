@@ -4,10 +4,12 @@ import type {
   ArtifactLinked,
   MessagePosted,
   ParticleEvent,
+  PlanProposed,
   ProjectCreated,
   ProjectStatusChanged,
   ProjectSource,
   ReviewPosted,
+  ReviewRequested,
   TaskClaimed,
   TaskCreated,
   TaskUpdated,
@@ -35,8 +37,12 @@ export interface ProjectState {
   title: string;
   status: ProjectStatusChanged['status'];
   source?: ProjectSource;
+  /** Latest proposal in canonical event order. */
+  plan?: PlanProposed;
   messages: MessageState[];
   tasks: Record<string, TaskState>;
+  /** Latest review request in canonical event order. */
+  reviewRequested?: ReviewRequested;
   lastReview?: { verdict: ReviewPosted['verdict']; by: ActorId; at: string };
   artifacts: ArtifactLinked[];
   /** Highest lamport clock folded in. */
@@ -71,6 +77,22 @@ export function fold(projectId: string, events: Iterable<ParticleEvent>): Projec
   return state;
 }
 
+/** Fold an event set into one deterministic state per project id. */
+export function foldMany(events: Iterable<ParticleEvent>): Map<string, ProjectState> {
+  const grouped = new Map<string, ParticleEvent[]>();
+  for (const event of events) {
+    const projectEvents = grouped.get(event.project);
+    if (projectEvents) projectEvents.push(event);
+    else grouped.set(event.project, [event]);
+  }
+
+  const states = new Map<string, ProjectState>();
+  for (const projectId of [...grouped.keys()].sort()) {
+    states.set(projectId, fold(projectId, grouped.get(projectId)!));
+  }
+  return states;
+}
+
 function apply(state: ProjectState, event: ParticleEvent): void {
   if (event.project !== state.id || state.seen.has(event.id)) return;
   state.seen.add(event.id);
@@ -92,6 +114,11 @@ function apply(state: ProjectState, event: ParticleEvent): void {
         at: event.clock.wall,
         via: data.via,
       });
+      break;
+    }
+    case 'plan.proposed': {
+      const data = event.data as PlanProposed;
+      state.plan = { summary: data.summary, taskIds: [...data.taskIds] };
       break;
     }
     case 'task.created': {
@@ -128,6 +155,11 @@ function apply(state: ProjectState, event: ParticleEvent): void {
       state.lastReview = { verdict: data.verdict, by: event.actor, at: event.clock.wall };
       break;
     }
+    case 'review.requested': {
+      const data = event.data as ReviewRequested;
+      state.reviewRequested = { taskIds: [...data.taskIds] };
+      break;
+    }
     case 'artifact.linked': {
       state.artifacts.push(event.data as ArtifactLinked);
       break;
@@ -150,4 +182,35 @@ export function isConverged(state: ProjectState): boolean {
   if (tasks.length === 0) return false;
   if (!tasks.every((t) => t.status === 'done')) return false;
   return state.lastReview?.verdict === 'approve';
+}
+
+/** JSON-compatible ProjectState used as the materialized state.json shape. */
+export interface ProjectStateJson extends Omit<ProjectState, 'seen'> {
+  seen: string[];
+}
+
+/** Descriptive alias for consumers that prefer an explicit serializability name. */
+export type SerializableProjectState = ProjectStateJson;
+
+export function stateToJson(state: ProjectState): ProjectStateJson {
+  return {
+    id: state.id,
+    title: state.title,
+    status: state.status,
+    ...(state.source === undefined ? {} : { source: state.source }),
+    ...(state.plan === undefined
+      ? {}
+      : { plan: { summary: state.plan.summary, taskIds: [...state.plan.taskIds] } }),
+    messages: state.messages.map((message) => ({ ...message })),
+    tasks: Object.fromEntries(
+      Object.entries(state.tasks).map(([id, task]) => [id, { ...task, deps: [...task.deps] }]),
+    ),
+    ...(state.reviewRequested === undefined
+      ? {}
+      : { reviewRequested: { taskIds: [...state.reviewRequested.taskIds] } }),
+    ...(state.lastReview === undefined ? {} : { lastReview: { ...state.lastReview } }),
+    artifacts: state.artifacts.map((artifact) => ({ ...artifact })),
+    clock: state.clock,
+    seen: [...state.seen].sort(),
+  };
 }

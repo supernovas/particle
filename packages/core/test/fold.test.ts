@@ -1,9 +1,11 @@
 import { describe, expect, it } from 'vitest';
 import {
   fold,
+  foldMany,
   isConverged,
   newId,
   nextClock,
+  stateToJson,
   ulid,
   type ActorId,
   type Clock,
@@ -40,23 +42,28 @@ function sampleEvents(): ParticleEvent[] {
       source: { kind: 'github-issue', repo: 'acme/widget', number: 7 },
     }),
     event('message.posted', 'github:alice', 2, { body: 'please build the widget' }),
-    event('task.created', 'agent:planner/p1', 3, {
+    event('plan.proposed', 'agent:planner/p1', 3, {
+      summary: 'Build in dependency order',
+      taskIds: ['t1', 't2'],
+    }),
+    event('task.created', 'agent:planner/p1', 4, {
       taskId: 't1',
       title: 'scaffold',
       spec: 'set up the repo',
       deps: [],
     }),
-    event('task.created', 'agent:planner/p1', 4, {
+    event('task.created', 'agent:planner/p1', 5, {
       taskId: 't2',
       title: 'implement',
       spec: 'build the thing',
       deps: ['t1'],
     }),
-    event('task.claimed', 'agent:impl/i1', 5, { taskId: 't1' }),
-    event('task.updated', 'agent:impl/i1', 6, { taskId: 't1', status: 'done' }),
-    event('task.claimed', 'agent:impl/i2', 7, { taskId: 't2' }),
-    event('task.updated', 'agent:impl/i2', 8, { taskId: 't2', status: 'done' }),
-    event('review.posted', 'agent:reviewer/r1', 9, { verdict: 'approve', comments: [] }),
+    event('task.claimed', 'agent:impl/i1', 6, { taskId: 't1' }),
+    event('task.updated', 'agent:impl/i1', 7, { taskId: 't1', status: 'done' }),
+    event('task.claimed', 'agent:impl/i2', 8, { taskId: 't2' }),
+    event('task.updated', 'agent:impl/i2', 9, { taskId: 't2', status: 'done' }),
+    event('review.requested', 'agent:impl/i2', 10, { taskIds: ['t1', 't2'] }),
+    event('review.posted', 'agent:reviewer/r1', 11, { verdict: 'approve', comments: [] }),
   ];
 }
 
@@ -84,6 +91,11 @@ describe('fold', () => {
     expect(Object.keys(state.tasks)).toEqual(['t1', 't2']);
     expect(state.tasks['t1']!.status).toBe('done');
     expect(state.tasks['t1']!.assignee).toBe('agent:impl/i1');
+    expect(state.plan).toEqual({
+      summary: 'Build in dependency order',
+      taskIds: ['t1', 't2'],
+    });
+    expect(state.reviewRequested).toEqual({ taskIds: ['t1', 't2'] });
     expect(state.lastReview?.verdict).toBe('approve');
     expect(isConverged(state)).toBe(true);
   });
@@ -130,6 +142,27 @@ describe('fold', () => {
     const state = fold(PROJECT, [foreign]);
     expect(state.title).toBe('');
     expect(state.seen.size).toBe(0);
+  });
+
+  it('folds multiple projects independently in stable project order', () => {
+    const other = newId('prj');
+    const events = sampleEvents();
+    const otherCreated = { ...events[0]!, id: newId('evt'), project: other };
+    const states = foldMany([otherCreated, ...events]);
+    expect([...states.keys()]).toEqual([PROJECT, other].sort());
+    expect(states.get(PROJECT)?.title).toBe('Ship the widget');
+    expect(states.get(other)?.seen.size).toBe(1);
+  });
+
+  it('converts state Sets to a detached, deterministically ordered JSON shape', () => {
+    const state = fold(PROJECT, sampleEvents());
+    const json = stateToJson(state);
+    expect(json.seen).toEqual([...state.seen].sort());
+    expect(json.plan).toEqual(state.plan);
+    json.seen.push('evt_00000000000000000000000000');
+    json.tasks['t1']!.deps.push('mutated');
+    expect(state.seen.has('evt_00000000000000000000000000')).toBe(false);
+    expect(state.tasks['t1']!.deps).not.toContain('mutated');
   });
 });
 
