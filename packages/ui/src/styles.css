@@ -23,11 +23,11 @@
   --del: #d64545;
 
   --st-planning: #8a63e8;
-  --st-implementing: #2f6fed;
-  --st-reviewing: #a16207;
+  --st-executing: #2f6fed;
+  --st-review: #a16207;
   --st-changes: #d97706;
-  --st-merged: #178a4c;
-  --st-failed: #d64545;
+  --st-converged: #178a4c;
+  --st-abandoned: #d64545;
 
   --shadow-card: 0 1px 2px rgba(20, 18, 12, 0.05);
 }
@@ -51,11 +51,11 @@
   --del: #f07a7a;
 
   --st-planning: #a98ef5;
-  --st-implementing: #6f9bf5;
-  --st-reviewing: #d9a13e;
+  --st-executing: #6f9bf5;
+  --st-review: #d9a13e;
   --st-changes: #e8963f;
-  --st-merged: #4cc281;
-  --st-failed: #f07a7a;
+  --st-converged: #4cc281;
+  --st-abandoned: #f07a7a;
 
   --shadow-card: none;
 }
@@ -551,23 +551,26 @@ code {
 
 /* ------------------------------------------------------------ status marks */
 
+.st-open {
+  --st: var(--text-3);
+}
 .st-planning {
   --st: var(--st-planning);
 }
-.st-implementing {
-  --st: var(--st-implementing);
+.st-executing {
+  --st: var(--st-executing);
 }
-.st-reviewing {
-  --st: var(--st-reviewing);
+.st-review {
+  --st: var(--st-review);
 }
 .st-changes {
   --st: var(--st-changes);
 }
-.st-merged {
-  --st: var(--st-merged);
+.st-converged {
+  --st: var(--st-converged);
 }
-.st-failed {
-  --st: var(--st-failed);
+.st-abandoned {
+  --st: var(--st-abandoned);
 }
 
 .status-dot {
@@ -784,12 +787,12 @@ code {
 }
 
 .task.done .task-mark {
-  background: var(--st-merged);
-  border-color: var(--st-merged);
+  background: var(--st-converged);
+  border-color: var(--st-converged);
 }
 
 .task.running .task-mark {
-  border-color: var(--st-implementing);
+  border-color: var(--st-executing);
   border-top-color: transparent;
   animation: spin 1.1s linear infinite;
 }
@@ -860,11 +863,11 @@ code {
 }
 
 .k-commit {
-  color: var(--st-implementing);
+  color: var(--st-executing);
 }
 
 .k-review {
-  color: var(--st-reviewing);
+  color: var(--st-review);
 }
 
 .turn-time {
@@ -883,7 +886,7 @@ code {
 }
 
 .turn-title.ok {
-  color: var(--st-merged);
+  color: var(--st-converged);
 }
 
 .turn-text {
@@ -1013,4 +1016,57 @@ code {
   .pc-progress span {
     transition: none;
   }
+}
+
+/* ------------------------------------------------------------ live vs mock */
+
+.mode-chip {
+  margin-left: auto;
+  padding: 1.5px 8px;
+  border-radius: 99px;
+  font-size: 10px;
+  font-weight: 650;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  cursor: default;
+}
+
+.mode-live {
+  color: var(--st-converged);
+  background: color-mix(in srgb, var(--st-converged) 12%, transparent);
+}
+
+.mode-mock {
+  color: var(--text-3);
+  background: var(--hover);
+}
+
+.composer-note {
+  padding: 9px 12px;
+  border: 1px dashed var(--border-strong);
+  border-radius: 10px;
+  font-size: 12.5px;
+  color: var(--text-2);
+}
+
+.composer-note a {
+  color: var(--accent);
+  text-decoration: none;
+  font-weight: 550;
+}
+
+.side-empty {
+  margin: 0;
+  padding: 2px 8px;
+  font-size: 12.5px;
+  color: var(--text-3);
+}
+
+.splash {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 100dvh;
+  color: var(--text-3);
+  font-size: 13px;
 }

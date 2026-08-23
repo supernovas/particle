@@ -1,5 +1,5 @@
 import type { Channel, Project } from '../types';
-import { ACTORS, CURRENT_USER } from '../data';
+import { useActors } from '../actors';
 import { Avatar } from './Avatar';
 import { IconMoon, IconSun, Logo } from './icons';
 import { STATUS_LABEL, StatusDot } from './StatusChip';
@@ -11,14 +11,19 @@ interface SidebarProps {
   channelId: string;
   projectId: string | null;
   theme: 'light' | 'dark';
+  currentUserId: string;
+  workspaceLabel: string;
+  mode: 'live' | 'mock';
+  modeHint?: string;
   onSelectChannel: (id: string) => void;
   onOpenProject: (id: string) => void;
   onToggleTheme: () => void;
 }
 
 export function Sidebar(props: SidebarProps) {
-  const me = ACTORS[CURRENT_USER];
-  const settled = new Set(['merged', 'failed']);
+  const actor = useActors();
+  const me = actor(props.currentUserId);
+  const settled = new Set(['converged', 'abandoned']);
   const ordered = [
     ...props.projects.filter((p) => !settled.has(p.status)),
     ...props.projects.filter((p) => settled.has(p.status)),
@@ -30,8 +35,11 @@ export function Sidebar(props: SidebarProps) {
         <Logo size={22} />
         <div className="side-title">
           <strong>particle</strong>
-          <span>Supernovas</span>
+          <span>{props.workspaceLabel}</span>
         </div>
+        <span className={`mode-chip mode-${props.mode}`} title={props.modeHint}>
+          {props.mode}
+        </span>
       </div>
 
       <nav className="side-scroll">
@@ -53,6 +61,7 @@ export function Sidebar(props: SidebarProps) {
         })}
 
         <div className="side-label">Projects</div>
+        {ordered.length === 0 ? <p className="side-empty">No projects yet.</p> : null}
         {ordered.map((p) => {
           const active = p.id === props.projectId;
           return (
@@ -72,7 +81,7 @@ export function Sidebar(props: SidebarProps) {
       <div className="side-foot">
         <Avatar actor={me} size={26} />
         <div className="side-me">
-          <strong>{me.kind === 'human' ? me.name : me.id}</strong>
+          <strong>{me.name}</strong>
           <span className="presence">online</span>
         </div>
         <button

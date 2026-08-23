@@ -13,6 +13,8 @@ import { loadConfig } from './config.ts';
 import { InstallationTokenProvider, loadAppCreds } from './github/auth.ts';
 import { emptyCursor, IssueChannel, type Cursor, type Prompt } from './github/issues.ts';
 import { Journal } from './journal.ts';
+import { serializeWorkspace } from './serialize.ts';
+import { startServer, type UiServer } from './server.ts';
 
 const STATE_DIR = '.particle';
 const CURSOR_PATH = `${STATE_DIR}/cursor.json`;
@@ -43,7 +45,7 @@ function promptToEvents(log: ProjectLog, prompt: Prompt, isNew: boolean): Partic
       type: 'project.created',
       project: log.id,
       actor: `github:${prompt.author}`,
-      clock: nextClock(lastClock(log), [], new Date()),
+      clock: nextClock(lastClock(log), [], new Date(prompt.at)),
       parents: parents(),
       data: {
         title: prompt.issueTitle,
@@ -63,7 +65,7 @@ function promptToEvents(log: ProjectLog, prompt: Prompt, isNew: boolean): Partic
     type: 'message.posted',
     project: log.id,
     actor: `github:${prompt.author}`,
-    clock: nextClock(lastClock(log), [], new Date()),
+    clock: nextClock(lastClock(log), [], new Date(prompt.at)),
     parents: parents(),
     data: { body: prompt.body, via: prompt.url },
   };
@@ -80,6 +82,7 @@ async function main() {
   const tokens = new InstallationTokenProvider(creds, owner!);
   const channel = new IssueChannel(tokens, config.channels.githubIssues, creds.slug);
   const journal = new Journal(`${STATE_DIR}/journal.ndjson`);
+  const operator = process.env.PARTICLE_OPERATOR ?? 'operator';
 
   console.log(`particle-worker v0 — host ${config.host.repo}, app ${creds.slug} (#${creds.id})`);
 
@@ -101,6 +104,43 @@ async function main() {
   }
   if (projects.size > 0) {
     console.log(`replayed journal: ${projects.size} project(s)`);
+  }
+
+  let server: UiServer | undefined;
+  if (!process.argv.includes('--no-serve')) {
+    const port = Number(process.env.PARTICLE_UI_PORT ?? 7455);
+    server = startServer(
+      {
+        payload: () => serializeWorkspace([...projects.values()], config, operator),
+        async postMessage(projectId, body) {
+          const log = [...projects.values()].find((l) => l.id === projectId);
+          if (!log) return false;
+          const event: ParticleEvent<MessagePosted> = {
+            v: 0,
+            id: newId('evt'),
+            type: 'message.posted',
+            project: log.id,
+            actor: `github:${operator}`,
+            clock: nextClock(lastClock(log), [], new Date()),
+            parents: log.events.length > 0 ? [log.events.at(-1)!.id] : [],
+            data: { body },
+          };
+          log.events.push(event);
+          journal.append([event]);
+          server?.broadcast();
+          if (config.channels.githubIssues.mirror) {
+            const state = fold(log.id, log.events);
+            if (state.source?.kind === 'github-issue') {
+              await channel.post(state.source.number, `**${operator}** via particle:\n\n${body}`);
+            }
+          }
+          return true;
+        },
+      },
+      port,
+      'packages/ui/dist',
+    );
+    console.log(`ui: http://localhost:${port} (api + events; dist served when built)`);
   }
 
   let cursor = loadCursor();
@@ -127,6 +167,7 @@ async function main() {
         touched.add(prompt.projectKey);
       }
       journal.append(fresh);
+      if (fresh.length > 0) server?.broadcast();
       writeFileSync(CURSOR_PATH, JSON.stringify(cursor, null, 2) + '\n');
       for (const key of touched) {
         const log = projects.get(key)!;
@@ -147,6 +188,7 @@ async function main() {
       setTimeout(resolve, config.channels.githubIssues.pollIntervalSeconds * 1000),
     );
   } while (!stopping);
+  server?.close();
 }
 
 main().catch((err) => {

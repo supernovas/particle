@@ -37,9 +37,9 @@ pane is for steering, not just reading.
 
 ## Legibility system
 
-- **Status taxonomy** (one hue each, used in dots, chips, and bars):
-  planning · implementing · in review · changes requested · merged · failed.
-  Live states pulse gently; settled states don't.
+- **Status taxonomy** (one hue each, used in dots, chips, and bars), straight from the
+  protocol (docs/SPEC.md §8): open · planning · executing · in review · changes requested ·
+  converged · abandoned. Live states pulse gently; settled states don't.
 - **Actor identity:** humans get round tinted-initial avatars; agents get square monospace
   marks (P, I1, I2, R) in the accent color; integrations (the GitHub bridge) post as apps
   with the particle mark. You can tell who did what from the avatar shape alone.
@@ -52,13 +52,17 @@ DMs, reactions, search, notifications, and settings are all absent on purpose �
 them are needed to validate the core loop, and each is additive later. Single org, single
 repo for now. Light and dark themes ship because tokens made it nearly free.
 
-## What's mock vs. real
+## What's live vs. mock
 
-Real: all layout and interaction — navigation, selection, composing, replying, pausing,
-theme, unreads. Mock: the data (`src/data.ts`), a short scripted feed that plays one
-implement → review → changes → fix pass after load, and the pause button's effect. The
-domain model in `src/types.ts` is the proposed contract for the worker: the UI is a pure
-function of that data, so wiring the backend should not require touching components.
+Live (against `npm run particle-worker`): the workspace snapshot and every update — real
+projects from the GitHub issues channel, real transcripts folded from the event log, and
+replies posted back into the log as the operator. Affordances the backend can't honor yet
+hide instead of pretending: no pause button until there's a scheduler, no ref line until
+the git ref store (P1.T3) replaces the journal, and the channel composer becomes a
+"start a project on GitHub" note. Mock (`?mock=1`, or automatic fallback when the worker
+is unreachable): `src/data.ts` plus a scripted implement → review pass — kept as the
+design showcase. The `src/types.ts` domain model is the contract; the worker's serializer
+produces it, so components never know which world they're rendering.
 
 ## Next steps
 

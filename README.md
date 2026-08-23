@@ -33,8 +33,12 @@ npm install
 # One-time: register + install a GitHub App for your org (writes ./.particle/, gitignored)
 node scripts/create-github-app.mjs <your-org>
 
-npm run particle-worker        # daemon: polls project issues, journals events
+npm run particle-worker        # daemon: polls project issues, journals events, serves the UI
 npm run particle-worker -- --once   # single poll, then exit
+
+npm run build -w @particle/ui  # build the workspace UI once…
+open http://localhost:7455     # …and the worker serves it (live data, SSE)
+npm run ui                     # or: vite dev server on :5173, proxied to the worker
 ```
 
 The worker tails issues labeled `particle:project` (plus seed issues) as live projects,
@@ -49,7 +53,8 @@ npm run typecheck  # tsc
 ```
 
 Packages: [`@particle/core`](./packages/core) (event model, clocks, deterministic fold),
-[`@particle/worker`](./packages/worker) (daemon). Task breakdown and status live in the
-tracking issues filed from [#1](https://github.com/supernovas/particle/issues/1).
+[`@particle/worker`](./packages/worker) (daemon + local API/SSE for the UI), and
+[`@particle/ui`](./packages/ui) (the three-pane workspace). Task breakdown and status live
+in the tracking issues filed from [#1](https://github.com/supernovas/particle/issues/1).
 
 MIT licensed.

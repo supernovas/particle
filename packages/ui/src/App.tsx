@@ -1,19 +1,8 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { ACTORS, CHANNELS, CURRENT_USER, MESSAGES, PROJECTS, SIM, TURNS } from './data';
+import { ACTORS, CHANNELS, CURRENT_USER, MESSAGES, PROJECTS, REPO_URL, SIM, TURNS } from './data';
+import { useLiveWorkspace, type WorkspacePayload } from './live';
 import type { Message, Project, Turn } from './types';
-import { ChannelView } from './components/ChannelView';
-import { ProjectPane } from './components/ProjectPane';
-import { Sidebar } from './components/Sidebar';
-
-type Theme = 'light' | 'dark';
-
-function initialTheme(): Theme {
-  const fromUrl = new URLSearchParams(window.location.search).get('theme');
-  if (fromUrl === 'light' || fromUrl === 'dark') return fromUrl;
-  const saved = window.localStorage.getItem('particle-theme');
-  if (saved === 'light' || saved === 'dark') return saved;
-  return window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
-}
+import { Workspace } from './Workspace';
 
 function now(): string {
   const d = new Date();
@@ -27,7 +16,66 @@ function nextId(prefix: string): string {
 }
 
 export default function App() {
-  const [theme, setTheme] = useState<Theme>(initialTheme);
+  const live = useLiveWorkspace();
+  if (live.status === 'connecting') {
+    return <div className="splash">connecting to the worker…</div>;
+  }
+  if (live.status === 'live' && live.data) {
+    return <LiveApp data={live.data} post={live.post} />;
+  }
+  return <MockApp offline={live.status === 'offline'} />;
+}
+
+function LiveApp({
+  data,
+  post,
+}: {
+  data: WorkspacePayload;
+  post: (projectId: string, body: string) => Promise<void>;
+}) {
+  const settled = new Set(['converged', 'abandoned']);
+  const [channelId, setChannelId] = useState(() => data.channels[0]?.id ?? '');
+  const [projectId, setProjectId] = useState<string | null>(
+    () => (data.projects.find((p) => !settled.has(p.status)) ?? data.projects[0])?.id ?? null,
+  );
+
+  const actors = useMemo(() => Object.fromEntries(data.actors.map((a) => [a.id, a])), [data]);
+
+  return (
+    <Workspace
+      actors={actors}
+      channels={data.channels}
+      messages={data.messages}
+      projects={data.projects}
+      turns={data.turns}
+      currentUserId={data.currentUserId}
+      workspaceLabel={data.workspace.repo}
+      mode="live"
+      modeHint={`Connected to the local worker · posting as ${data.workspace.operator}`}
+      repoUrl={`https://github.com/${data.workspace.repo}`}
+      unreads={{}}
+      channelId={channelId}
+      projectId={projectId}
+      onSelectChannel={setChannelId}
+      onJumpToProject={(id) => {
+        setProjectId(id);
+        const home = data.projects.find((p) => p.id === id)?.channelId;
+        if (home) setChannelId(home);
+      }}
+      onOpenProject={setProjectId}
+      onCloseProject={() => setProjectId(null)}
+      startNote={{
+        href: data.workspace.newProjectUrl,
+        label: 'Projects in this channel start from GitHub issues.',
+      }}
+      onSendReply={(text) => {
+        if (projectId) void post(projectId, text).catch((err) => console.error(err));
+      }}
+    />
+  );
+}
+
+function MockApp({ offline }: { offline: boolean }) {
   const [channelId, setChannelId] = useState('eng');
   const [projectId, setProjectId] = useState<string | null>('speed-up-ci');
   const [messages, setMessages] = useState<Message[]>(MESSAGES);
@@ -38,11 +86,6 @@ export default function App() {
   );
   const [paused, setPaused] = useState(false);
   const timers = useRef<number[]>([]);
-
-  useEffect(() => {
-    document.documentElement.dataset.theme = theme;
-    window.localStorage.setItem('particle-theme', theme);
-  }, [theme]);
 
   // Scripted mock feed: one pass of the implement → review loop, then quiet.
   useEffect(() => {
@@ -82,45 +125,14 @@ export default function App() {
     () => Object.fromEntries(projects.map((p) => [p.id, p])),
     [projects],
   );
-  const channel = CHANNELS.find((c) => c.id === channelId) ?? CHANNELS[0];
-  const project = projectId ? (projectsById[projectId] ?? null) : null;
 
   function selectChannel(id: string) {
     setChannelId(id);
     setUnreads((u) => (u[id] ? { ...u, [id]: 0 } : u));
   }
 
-  /** Open a project and follow it to its home channel (sidebar navigation). */
-  function jumpToProject(id: string) {
-    setProjectId(id);
-    const home = projectsById[id]?.channelId;
-    if (home && home !== channelId) selectChannel(home);
-  }
-
-  function sendMessage(text: string) {
-    setMessages((prev) => [
-      ...prev,
-      { id: nextId('m'), channelId: channel.id, authorId: CURRENT_USER, time: now(), text },
-    ]);
-  }
-
-  function sendReply(text: string) {
-    if (!project) return;
-    setTurns((prev) => [
-      ...prev,
-      {
-        id: nextId('t'),
-        projectId: project.id,
-        actorId: CURRENT_USER,
-        kind: 'comment',
-        time: now(),
-        title: text,
-      },
-    ]);
-  }
-
   function togglePause() {
-    if (!project) return;
+    if (!projectId) return;
     const me = ACTORS[CURRENT_USER];
     const name = me.kind === 'human' ? me.handle : me.name;
     if (!paused) {
@@ -132,7 +144,7 @@ export default function App() {
       ...prev,
       {
         id: nextId('t'),
-        projectId: project.id,
+        projectId,
         actorId: CURRENT_USER,
         kind: 'status',
         time: now(),
@@ -141,40 +153,55 @@ export default function App() {
     ]);
   }
 
-  const channelMessages = messages.filter((m) => m.channelId === channel.id);
-  const projectTurns = project ? turns.filter((t) => t.projectId === project.id) : [];
-
   return (
-    <div className={`app${project ? '' : ' no-detail'}`}>
-      <Sidebar
-        channels={CHANNELS}
-        projects={projects}
-        unreads={unreads}
-        channelId={channel.id}
-        projectId={projectId}
-        theme={theme}
-        onSelectChannel={selectChannel}
-        onOpenProject={jumpToProject}
-        onToggleTheme={() => setTheme(theme === 'dark' ? 'light' : 'dark')}
-      />
-      <ChannelView
-        channel={channel}
-        messages={channelMessages}
-        projects={projectsById}
-        selectedProjectId={projectId}
-        onOpenProject={setProjectId}
-        onSend={sendMessage}
-      />
-      {project ? (
-        <ProjectPane
-          project={project}
-          turns={projectTurns}
-          paused={paused}
-          onClose={() => setProjectId(null)}
-          onTogglePause={togglePause}
-          onReply={sendReply}
-        />
-      ) : null}
-    </div>
+    <Workspace
+      actors={ACTORS}
+      channels={CHANNELS}
+      messages={messages}
+      projects={projects}
+      turns={turns}
+      currentUserId={CURRENT_USER}
+      workspaceLabel="Supernovas"
+      mode="mock"
+      modeHint={
+        offline
+          ? 'Worker unreachable — showing the design dataset. Start it with: npm run particle-worker'
+          : 'Design dataset (?mock=1) — drop the flag to connect to the worker'
+      }
+      repoUrl={REPO_URL}
+      unreads={unreads}
+      channelId={channelId}
+      projectId={projectId}
+      paused={paused}
+      onSelectChannel={selectChannel}
+      onJumpToProject={(id) => {
+        setProjectId(id);
+        const home = projectsById[id]?.channelId;
+        if (home && home !== channelId) selectChannel(home);
+      }}
+      onOpenProject={setProjectId}
+      onCloseProject={() => setProjectId(null)}
+      onSendChannel={(text) => {
+        setMessages((prev) => [
+          ...prev,
+          { id: nextId('m'), channelId, authorId: CURRENT_USER, time: now(), text },
+        ]);
+      }}
+      onSendReply={(text) => {
+        if (!projectId) return;
+        setTurns((prev) => [
+          ...prev,
+          {
+            id: nextId('t'),
+            projectId,
+            actorId: CURRENT_USER,
+            kind: 'comment',
+            time: now(),
+            title: text,
+          },
+        ]);
+      }}
+      onTogglePause={togglePause}
+    />
   );
 }

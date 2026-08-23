@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import type { Project, Task, Turn } from '../types';
-import { ACTORS, REPO_URL } from '../data';
+import { useActors } from '../actors';
 import { Avatar, Facepile } from './Avatar';
 import { Composer } from './Composer';
 import { IconBranch, IconCheck, IconCopy, IconPause, IconPlay, IconX } from './icons';
@@ -10,17 +10,22 @@ interface ProjectPaneProps {
   project: Project;
   turns: Turn[];
   paused: boolean;
+  repoUrl: string;
   onClose: () => void;
-  onTogglePause: () => void;
+  /** Absent while the scheduler doesn't exist yet — the button hides. */
+  onTogglePause?: () => void;
   onReply: (text: string) => void;
 }
 
 function TaskRow({ task }: { task: Task }) {
-  const assignee = task.assignee ? ACTORS[task.assignee] : undefined;
+  const actor = useActors();
+  const assignee = task.assignee ? actor(task.assignee) : undefined;
   return (
     <li className={`task ${task.state}`}>
       <span className="task-mark">{task.state === 'done' ? <IconCheck size={10} /> : null}</span>
-      <span className="task-title">{task.title}</span>
+      <span className="task-title" title={task.title}>
+        {task.title}
+      </span>
       {assignee ? <Avatar actor={assignee} size={16} /> : null}
     </li>
   );
@@ -34,25 +39,26 @@ const KIND_LABEL: Partial<Record<Turn['kind'], string>> = {
 };
 
 function TurnRow({ turn }: { turn: Turn }) {
+  const actor = useActors();
   if (turn.kind === 'status') {
     return (
       <div className="sys-turn">
-        {turn.title} · {turn.time}
+        {actor(turn.actorId).name} · {turn.title} · {turn.time}
       </div>
     );
   }
-  const actor = ACTORS[turn.actorId];
+  const author = actor(turn.actorId);
   const label = KIND_LABEL[turn.kind];
-  // Prototype-only: the mock encodes the verdict in the title.
+  // The verdict is encoded in the title by the serializer (and the mock).
   const verdict =
     turn.kind === 'review' ? (turn.title.toLowerCase().includes('approved') ? 'ok' : 'warn') : '';
 
   return (
     <div className="turn">
-      <Avatar actor={actor} size={24} />
+      <Avatar actor={author} size={24} />
       <div className="turn-main">
         <div className="turn-head">
-          <span className="turn-name">{actor.name}</span>
+          <span className="turn-name">{author.name}</span>
           {label ? <span className={`turn-kind k-${turn.kind}`}>{label}</span> : null}
           <span className="turn-time">{turn.time}</span>
         </div>
@@ -74,6 +80,7 @@ function TurnRow({ turn }: { turn: Turn }) {
 
 export function ProjectPane(props: ProjectPaneProps) {
   const { project } = props;
+  const actor = useActors();
   const [copied, setCopied] = useState(false);
   const scrollRef = useRef<HTMLDivElement>(null);
   const turnCount = props.turns.length;
@@ -95,10 +102,11 @@ export function ProjectPane(props: ProjectPaneProps) {
       if (nearBottom) el.scrollTop = el.scrollHeight;
     }
   }, [turnCount, project.id]);
-  const watchers = project.watchers.map((id) => ACTORS[id]).filter(Boolean);
+
+  const watchers = project.watchers.map((id) => actor(id));
 
   function copyFetch() {
-    navigator.clipboard.writeText(`git fetch origin ${project.ref}`).then(() => {
+    void navigator.clipboard.writeText(`git fetch origin ${project.ref}`).then(() => {
       setCopied(true);
       window.setTimeout(() => setCopied(false), 1600);
     });
@@ -112,14 +120,16 @@ export function ProjectPane(props: ProjectPaneProps) {
           <h2>{project.title}</h2>
         </div>
         <div className="detail-actions">
-          <button
-            className="icon-btn"
-            onClick={props.onTogglePause}
-            aria-label={props.paused ? 'Resume agents' : 'Pause agents'}
-            title={props.paused ? 'Resume agents' : 'Pause agents'}
-          >
-            {props.paused ? <IconPlay /> : <IconPause />}
-          </button>
+          {props.onTogglePause ? (
+            <button
+              className="icon-btn"
+              onClick={props.onTogglePause}
+              aria-label={props.paused ? 'Resume agents' : 'Pause agents'}
+              title={props.paused ? 'Resume agents' : 'Pause agents'}
+            >
+              {props.paused ? <IconPlay /> : <IconPause />}
+            </button>
+          ) : null}
           <button className="icon-btn" onClick={props.onClose} aria-label="Close" title="Close">
             <IconX />
           </button>
@@ -134,7 +144,7 @@ export function ProjectPane(props: ProjectPaneProps) {
             {project.issue ? (
               <a
                 className="issue-chip"
-                href={`${REPO_URL}/issues/${project.issue}`}
+                href={`${props.repoUrl}/issues/${project.issue}`}
                 target="_blank"
                 rel="noreferrer"
               >
@@ -152,18 +162,20 @@ export function ProjectPane(props: ProjectPaneProps) {
               </span>
             </div>
           ) : null}
-          <div className="ref-line">
-            <IconBranch />
-            <code>{project.ref}</code>
-            <button
-              className="icon-btn"
-              onClick={copyFetch}
-              aria-label="Copy fetch command"
-              title={`git fetch origin ${project.ref}`}
-            >
-              {copied ? <IconCheck /> : <IconCopy />}
-            </button>
-          </div>
+          {project.ref ? (
+            <div className="ref-line">
+              <IconBranch />
+              <code>{project.ref}</code>
+              <button
+                className="icon-btn"
+                onClick={copyFetch}
+                aria-label="Copy fetch command"
+                title={`git fetch origin ${project.ref}`}
+              >
+                {copied ? <IconCheck /> : <IconCopy />}
+              </button>
+            </div>
+          ) : null}
         </div>
 
         <section className="detail-section">
@@ -175,7 +187,7 @@ export function ProjectPane(props: ProjectPaneProps) {
               ))}
             </ul>
           ) : (
-            <p className="empty-line">The planner is drafting the plan…</p>
+            <p className="empty-line">No plan yet.</p>
           )}
         </section>
 

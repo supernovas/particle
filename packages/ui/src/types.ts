@@ -19,13 +19,12 @@ export interface Human {
   online?: boolean;
 }
 
-export type AgentRole = 'planner' | 'implementer' | 'reviewer';
-
 export interface Agent {
   kind: 'agent';
   id: ActorId;
   name: string;
-  role: AgentRole;
+  /** planner | implementer | reviewer | any future role */
+  role: string;
 }
 
 /** Integrations that post on their own behalf, e.g. the GitHub bridge. */
@@ -38,11 +37,12 @@ export interface AppActor {
 export type Actor = Human | Agent | AppActor;
 
 /**
- * Project lifecycle. `implementing` ⇄ `reviewing`/`changes` loop until the
- * reviewer approves (fixed point) and the work merges.
+ * Project lifecycle, mirroring the protocol (docs/SPEC.md §8): the
+ * executing ⇄ review/changes loop runs until the reviewer approves and the
+ * project converges. `changes` is the review verdict surfaced as a state.
  */
 export type ProjectStatus =
-  'planning' | 'implementing' | 'reviewing' | 'changes' | 'merged' | 'failed';
+  'open' | 'planning' | 'executing' | 'review' | 'changes' | 'converged' | 'abandoned';
 
 export type TaskState = 'queued' | 'running' | 'done' | 'blocked';
 
