@@ -48,6 +48,11 @@ sudo -u runner ./config.sh --unattended \
   --labels gcp,linux,x64 \
   --replace
 
+# Seed job PATH with the runner user's cargo bin (config.sh under sudo captures
+# secure_path only, which would hide rustup from CI jobs).
+echo "/home/runner/.cargo/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin" >.path
+chown runner:runner .path
+
 ./svc.sh install runner
 ./svc.sh start
 echo "=== runner startup done $(date -Is) ==="

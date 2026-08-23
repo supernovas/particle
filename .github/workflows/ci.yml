@@ -7,7 +7,7 @@ on:
 
 jobs:
   test:
-    runs-on: ubuntu-latest
+    runs-on: [self-hosted, linux, x64, gcp]
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -20,7 +20,7 @@ jobs:
       - run: npm run format:check
 
   rust:
-    runs-on: ubuntu-latest
+    runs-on: [self-hosted, linux, x64, gcp]
     defaults:
       run:
         working-directory: rust
