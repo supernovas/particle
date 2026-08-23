@@ -12,10 +12,11 @@
   },
   "scripts": {
     "particle-worker": "tsx packages/worker/src/main.ts",
-    "typecheck": "tsc --noEmit",
+    "typecheck": "tsc --noEmit && npm run typecheck --workspace @particle/ui",
     "test": "vitest run",
     "format": "prettier --write .",
-    "format:check": "prettier --check ."
+    "format:check": "prettier --check .",
+    "ui": "npm run dev --workspace @particle/ui"
   },
   "devDependencies": {
     "@types/node": "^24.0.0",
