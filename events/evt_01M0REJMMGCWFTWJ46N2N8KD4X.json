@@ -1,0 +1,1 @@
+{"actor":"github:drx","clock":{"lamport":1,"wall":"2026-08-23T21:15:29.000Z"},"data":{"source":{"kind":"github-issue","number":20,"repo":"supernovas/particle"},"title":"build self-hosted gcp github action runners"},"id":"evt_01M0REJMMGCWFTWJ46N2N8KD4X","parents":[],"project":"prj_01M0REJMMGTKGBYXSSX62NBY11","type":"project.created","v":0}
