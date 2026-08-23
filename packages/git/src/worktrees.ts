@@ -1,5 +1,5 @@
 import { createHash, randomBytes } from 'node:crypto';
-import { mkdir, mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
+import { mkdir, mkdtemp, readFile, rename, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
 import { runIn } from './git.ts';
@@ -41,17 +41,41 @@ export async function createTaskWorktree(
 
 /** Remove an isolated task worktree and its task branch. */
 export async function removeTaskWorktree(repoDir: string, path: string): Promise<void> {
-  const ownership = await readOwnership(repoDir, path);
+  let ownership = await readOwnership(repoDir, path);
   const registered = await registeredWorktreeAt(repoDir, ownership.registeredPath);
   if (registered && registered.branch !== ownership.branch) {
     throw new Error(`task worktree branch does not match ownership marker: ${registered.branch}`);
   }
   if (registered) {
     await verifyWorktreeIdentity(registered.path, ownership.nonce);
+    const expectedTip = await readRef(repoDir, `refs/heads/${ownership.branch}`);
+    if (!expectedTip) {
+      throw new Error(`task worktree branch is missing: ${ownership.branch}`);
+    }
+    ownership = { ...ownership, phase: 'removing', expectedTip };
+    await replaceOwnershipMarker(ownership);
     await runIn(repoDir, ['worktree', 'remove', '--force', registered.path]);
+  } else if (ownership.phase === 'active') {
+    if (await refExists(repoDir, `refs/heads/${ownership.branch}`)) {
+      throw new Error(`refusing to delete branch from stale ownership marker: ${ownership.branch}`);
+    }
+    await rm(ownership.marker);
+    return;
   }
-  if (await refExists(repoDir, `refs/heads/${ownership.branch}`)) {
-    await runIn(repoDir, ['branch', '-D', ownership.branch]);
+
+  const checkedOut = (await registeredWorktrees(repoDir)).find(
+    ({ branch }) => branch === ownership.branch,
+  );
+  if (checkedOut) {
+    throw new Error(`task branch is checked out in another worktree: ${checkedOut.path}`);
+  }
+  const branchRef = `refs/heads/${ownership.branch}`;
+  const actualTip = await readRef(repoDir, branchRef);
+  if (actualTip) {
+    if (actualTip !== ownership.expectedTip) {
+      throw new Error(`refusing to remove replacement task branch: ${ownership.branch}`);
+    }
+    await runIn(repoDir, ['update-ref', '-d', branchRef, ownership.expectedTip]);
   }
   await rm(ownership.marker);
 }
@@ -96,6 +120,14 @@ async function refExists(repoDir: string, ref: string): Promise<boolean> {
   }
 }
 
+async function readRef(repoDir: string, ref: string): Promise<string | undefined> {
+  try {
+    return (await runIn(repoDir, ['rev-parse', '--verify', ref])).trim();
+  } catch {
+    return undefined;
+  }
+}
+
 interface RegisteredWorktree {
   path: string;
   branch: string;
@@ -133,13 +165,16 @@ async function registeredWorktreeForBranch(
   return matches[0]!;
 }
 
-interface Ownership {
+interface OwnershipBase {
   path: string;
   registeredPath: string;
   branch: string;
   nonce: string;
   marker: string;
 }
+
+type Ownership = OwnershipBase &
+  ({ phase: 'active'; expectedTip?: never } | { phase: 'removing'; expectedTip: string });
 
 async function writeOwnership(repoDir: string, path: string, branch: string): Promise<void> {
   const marker = await markerPath(repoDir, path);
@@ -148,8 +183,26 @@ async function writeOwnership(repoDir: string, path: string, branch: string): Pr
   const nonce = randomBytes(32).toString('hex');
   const identity = await worktreeIdentityPath(registered.path);
   await writeFile(identity, `${nonce}\n`, { flag: 'wx' });
-  const ownership = { path: resolve(path), registeredPath: registered.path, branch, nonce };
+  const ownership = {
+    path: resolve(path),
+    registeredPath: registered.path,
+    branch,
+    nonce,
+    phase: 'active',
+  };
   await writeFile(marker, `${JSON.stringify(ownership)}\n`, { flag: 'wx' });
+}
+
+async function replaceOwnershipMarker(ownership: Ownership): Promise<void> {
+  const temporary = `${ownership.marker}.tmp-${randomBytes(16).toString('hex')}`;
+  const { marker: _marker, ...serialized } = ownership;
+  try {
+    await writeFile(temporary, `${JSON.stringify(serialized)}\n`, { flag: 'wx' });
+    await rename(temporary, ownership.marker);
+  } catch (error) {
+    await rm(temporary, { force: true });
+    throw error;
+  }
 }
 
 async function readOwnership(repoDir: string, path: string): Promise<Ownership> {
@@ -170,17 +223,24 @@ async function readOwnership(repoDir: string, path: string): Promise<Ownership> 
     !('branch' in value) ||
     typeof value.branch !== 'string' ||
     !('nonce' in value) ||
-    typeof value.nonce !== 'string'
+    typeof value.nonce !== 'string' ||
+    !('phase' in value) ||
+    (value.phase !== 'active' && value.phase !== 'removing')
   ) {
     throw new Error(`invalid task worktree ownership marker: ${marker}`);
   }
-  return {
+  const base = {
     path: value.path as string,
     registeredPath: value.registeredPath,
     branch: value.branch,
     nonce: value.nonce,
     marker,
   };
+  if (value.phase === 'active') return { ...base, phase: 'active' };
+  if (!('expectedTip' in value) || typeof value.expectedTip !== 'string') {
+    throw new Error(`invalid task worktree ownership marker: ${marker}`);
+  }
+  return { ...base, phase: 'removing', expectedTip: value.expectedTip };
 }
 
 async function verifyWorktreeIdentity(path: string, nonce: string): Promise<void> {

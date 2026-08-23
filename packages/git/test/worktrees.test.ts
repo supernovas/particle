@@ -168,4 +168,72 @@ describe('task worktrees', () => {
     await exec('git', ['-C', repoDir, 'branch', '-D', 'particle/prj_replaced/tsk_replaced']);
     roots.splice(roots.indexOf(path), 1);
   });
+
+  it('refuses to delete a replacement branch from a stale ownership marker', async () => {
+    const repoDir = await mkdtemp(join(tmpdir(), 'particle-worktrees-stale-branch-'));
+    roots.push(repoDir);
+    await exec('git', ['init', '-b', 'main', repoDir]);
+    await exec('git', ['-C', repoDir, 'config', 'user.name', 'test']);
+    await exec('git', ['-C', repoDir, 'config', 'user.email', 'test@example.com']);
+    await writeFile(join(repoDir, 'README.md'), 'root\n');
+    await exec('git', ['-C', repoDir, 'add', 'README.md']);
+    await exec('git', ['-C', repoDir, 'commit', '-m', 'initial']);
+    const path = await createTaskWorktree(repoDir, 'prj_stale', 'tsk_stale');
+    roots.push(path);
+    const taskBranch = 'particle/prj_stale/tsk_stale';
+
+    await exec('git', ['-C', repoDir, 'worktree', 'remove', '--force', path]);
+    roots.splice(roots.indexOf(path), 1);
+    await exec('git', ['-C', repoDir, 'branch', '-D', taskBranch]);
+    await writeFile(join(repoDir, 'replacement.txt'), 'replacement commit\n');
+    await exec('git', ['-C', repoDir, 'add', 'replacement.txt']);
+    await exec('git', ['-C', repoDir, 'commit', '-m', 'replacement']);
+    const { stdout: replacementSha } = await exec('git', ['-C', repoDir, 'rev-parse', 'HEAD']);
+    await exec('git', ['-C', repoDir, 'branch', taskBranch, 'HEAD']);
+
+    await expect(removeTaskWorktree(repoDir, path)).rejects.toThrow(/stale ownership marker/);
+    const { stdout: preservedSha } = await exec('git', ['-C', repoDir, 'rev-parse', taskBranch]);
+    expect(preservedSha).toBe(replacementSha);
+  });
+
+  it('preserves a replacement branch after a partial removal', async () => {
+    const repoDir = await mkdtemp(join(tmpdir(), 'particle-worktrees-replaced-retry-'));
+    roots.push(repoDir);
+    await exec('git', ['init', '-b', 'main', repoDir]);
+    await exec('git', ['-C', repoDir, 'config', 'user.name', 'test']);
+    await exec('git', ['-C', repoDir, 'config', 'user.email', 'test@example.com']);
+    await writeFile(join(repoDir, 'README.md'), 'root\n');
+    await exec('git', ['-C', repoDir, 'add', 'README.md']);
+    await exec('git', ['-C', repoDir, 'commit', '-m', 'initial']);
+    const path = await createTaskWorktree(repoDir, 'prj_replaced_retry', 'tsk_replaced_retry');
+    roots.push(path);
+    const taskBranch = 'particle/prj_replaced_retry/tsk_replaced_retry';
+    const competingPath = await mkdtemp(join(tmpdir(), 'particle-worktrees-replaced-competing-'));
+    roots.push(competingPath);
+    await exec('git', [
+      '-C',
+      repoDir,
+      'worktree',
+      'add',
+      '--force',
+      '--force',
+      competingPath,
+      taskBranch,
+    ]);
+
+    await expect(removeTaskWorktree(repoDir, path)).rejects.toThrow(/another worktree/);
+    roots.splice(roots.indexOf(path), 1);
+    await exec('git', ['-C', repoDir, 'worktree', 'remove', '--force', competingPath]);
+    roots.splice(roots.indexOf(competingPath), 1);
+    await exec('git', ['-C', repoDir, 'branch', '-D', taskBranch]);
+    await writeFile(join(repoDir, 'replacement.txt'), 'replacement after partial removal\n');
+    await exec('git', ['-C', repoDir, 'add', 'replacement.txt']);
+    await exec('git', ['-C', repoDir, 'commit', '-m', 'replacement']);
+    const { stdout: replacementSha } = await exec('git', ['-C', repoDir, 'rev-parse', 'HEAD']);
+    await exec('git', ['-C', repoDir, 'branch', taskBranch, 'HEAD']);
+
+    await expect(removeTaskWorktree(repoDir, path)).rejects.toThrow(/replacement task branch/);
+    const { stdout: preservedSha } = await exec('git', ['-C', repoDir, 'rev-parse', taskBranch]);
+    expect(preservedSha).toBe(replacementSha);
+  });
 });
