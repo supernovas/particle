@@ -21,4 +21,10 @@ ensure() {
 
 ensure particle-github-app-json .particle/github-app.json
 ensure particle-github-app-pem .particle/github-app.private-key.pem
+
+# Webhook secret (deploy fast path): extracted from the app secrets file.
+node -e "process.stdout.write(JSON.parse(require('fs').readFileSync('.particle/github-app.secrets.json','utf8')).webhook_secret)" \
+  >.particle/webhook-secret
+chmod 600 .particle/webhook-secret
+ensure particle-github-webhook-secret .particle/webhook-secret
 echo "secrets uploaded to project $PROJECT"
