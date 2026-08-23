@@ -1,0 +1,1 @@
+{"actor":"agent:worker/run_01M0RFYSN7XRT9GS2JDH9VWBS0","clock":{"lamport":10,"wall":"2026-08-23T23:41:44.339Z"},"data":{"status":"paused"},"id":"evt_01M0RG0S0KN18JS305JH88THAW","parents":["evt_01M0RG0S0JM2HQN6BF1DRYHHD4"],"project":"prj_01M0REJMMFPMETR83FQBS02NJ1","type":"project.status","v":0}
