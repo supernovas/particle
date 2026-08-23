@@ -61,8 +61,13 @@ cd "$APP.new"
 npm ci
 npm run build --workspace @particle/ui
 
-# App credentials come from Secret Manager via the instance service account;
-# each worker gets its own copy in its state dir, mode 0600.
+# App credentials come from Secret Manager via the instance service account.
+# The TS worker's state dir lives OUTSIDE the deploy blast radius at
+# /opt/particle/state: with PARTICLE_STORE=git its contents mirror
+# refs/particle/* on the host repo, so even losing the disk loses nothing —
+# a fresh machine recovers by fetching. The Rust worker keeps its per-clone
+# journal until it speaks the ref store.
+STATE=/opt/particle/state
 MTOKEN=$(curl -s -H "Metadata-Flavor: Google" \
   "http://metadata.google.internal/computeMetadata/v1/instance/service-accounts/default/token" \
   | python3 -c "import sys,json;print(json.load(sys.stdin)['access_token'])")
@@ -71,13 +76,13 @@ fetch_secret() {
     "https://secretmanager.googleapis.com/v1/projects/${project_id}/secrets/$1/versions/latest:access" \
     | python3 -c "import sys,json,base64;sys.stdout.buffer.write(base64.b64decode(json.load(sys.stdin)['payload']['data']))"
 }
-for dir in "$SRC.new/.particle" "$APP.new/.particle"; do
+for dir in "$SRC.new/.particle" "$STATE"; do
   mkdir -p "$dir"
   fetch_secret particle-github-app-json >"$dir/github-app.json"
   fetch_secret particle-github-app-pem >"$dir/github-app.private-key.pem"
-  chmod 600 "$dir"/*
+  chmod 600 "$dir"/github-app.*
 done
-chown -R particle:particle "$SRC.new" "$APP.new"
+chown -R particle:particle "$SRC.new" "$APP.new" "$STATE"
 
 cat >/etc/systemd/system/particle-worker.service <<'UNIT'
 [Unit]
@@ -106,6 +111,8 @@ Wants=network-online.target
 User=particle
 WorkingDirectory=/opt/particle/app
 Environment=PARTICLE_UI_PORT=7455
+Environment=PARTICLE_STORE=git
+Environment=PARTICLE_STATE_DIR=/opt/particle/state
 ExecStart=/usr/bin/npm run particle-worker
 Restart=always
 RestartSec=10
