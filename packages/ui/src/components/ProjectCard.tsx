@@ -35,9 +35,15 @@ export function ProjectCard({ project, active, onOpen }: ProjectCardProps) {
       <div className="pc-meta">
         {total > 0 ? (
           <span>
-            {done}/{total} tasks · {project.diff.files} files{' '}
-            <b className="add">+{project.diff.additions}</b>{' '}
-            <b className="del">−{project.diff.deletions}</b> · round {project.round}
+            {done}/{total} tasks
+            {project.diff.files > 0 ? (
+              <>
+                {' '}
+                · {project.diff.files} files <b className="add">+{project.diff.additions}</b>{' '}
+                <b className="del">−{project.diff.deletions}</b>
+              </>
+            ) : null}{' '}
+            · round {project.round}
           </span>
         ) : (
           <span>No tasks yet</span>
