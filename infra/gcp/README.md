@@ -41,8 +41,11 @@ rest of Phase 3 in [#17](https://github.com/supernovas/particle/issues/17).
 ## CI runners (self-hosted GitHub Actions)
 
 `runners.tf` adds `runner_count` (default 1) org-level self-hosted runner VMs
-(`particle-ci-runner-N`, labels `gcp,linux,x64`) that register themselves at boot by minting
-a registration token from the app credentials in Secret Manager. One-time org-admin setup:
+(`particle-ci-runner-N`, labels `gcp,linux,x64`). Registration uses a short-lived token
+minted **on the operator machine** at apply time (`scripts/gh-runner-token.mjs`); the VMs
+hold no GitHub App credentials and their service account has no IAM roles, so a CI job that
+compromises a runner can escalate to nothing. A recreated runner needs a fresh
+`terraform apply` (which mints a fresh token). One-time org-admin setup:
 
 1. Grant the app the org permission **Self-hosted runners: Read and write**
    (app settings → Permissions & events), and approve the change on the installation.
