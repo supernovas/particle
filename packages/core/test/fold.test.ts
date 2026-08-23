@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import {
+  canonicalJson,
   fold,
   foldMany,
   isConverged,
@@ -163,6 +164,12 @@ describe('fold', () => {
     json.tasks['t1']!.deps.push('mutated');
     expect(state.seen.has('evt_00000000000000000000000000')).toBe(false);
     expect(state.tasks['t1']!.deps).not.toContain('mutated');
+  });
+
+  it('produces canonical JSON when optional message provenance is absent', () => {
+    const state = fold(PROJECT, sampleEvents());
+    expect(() => canonicalJson(stateToJson(state))).not.toThrow();
+    expect(Object.hasOwn(state.messages[0]!, 'via')).toBe(false);
   });
 });
 

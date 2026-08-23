@@ -112,7 +112,7 @@ function apply(state: ProjectState, event: ParticleEvent): void {
         actor: event.actor,
         body: data.body,
         at: event.clock.wall,
-        via: data.via,
+        ...(data.via === undefined ? {} : { via: data.via }),
       });
       break;
     }
