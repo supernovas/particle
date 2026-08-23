@@ -41,7 +41,7 @@ export const PROJECTS: Project[] = [
     title: 'Speed up CI',
     ref: 'refs/particle/speed-up-ci',
     channelId: 'eng',
-    status: 'implementing',
+    status: 'executing',
     startedBy: 'theo',
     round: 1,
     tasks: [
@@ -73,7 +73,7 @@ export const PROJECTS: Project[] = [
     title: 'Deflake the auth test suite',
     ref: 'refs/particle/deflake-auth',
     channelId: 'eng',
-    status: 'merged',
+    status: 'converged',
     startedBy: 'ada',
     round: 2,
     tasks: [
@@ -94,7 +94,7 @@ export const PROJECTS: Project[] = [
     title: 'Bootstrap Particle',
     ref: 'refs/particle/bootstrap',
     channelId: 'github-issues',
-    status: 'implementing',
+    status: 'executing',
     startedBy: 'jonas',
     issue: 1,
     round: 1,
@@ -121,7 +121,7 @@ export const PROJECTS: Project[] = [
     title: 'UI groundwork',
     ref: 'refs/particle/ui-groundwork',
     channelId: 'github-issues',
-    status: 'reviewing',
+    status: 'review',
     startedBy: 'mira',
     issue: 2,
     round: 1,
@@ -543,6 +543,6 @@ export const SIM: SimEvent[] = [
       title: 'ci: include webkit in shard three, hash overrides into the cache key',
       meta: 'c0dd41e · +21 −6',
     },
-    project: { id: 'speed-up-ci', status: 'reviewing', round: 2 },
+    project: { id: 'speed-up-ci', status: 'review', round: 2 },
   },
 ];

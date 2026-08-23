@@ -1,19 +1,21 @@
 import type { ProjectStatus } from '../types';
 
 export const STATUS_LABEL: Record<ProjectStatus, string> = {
+  open: 'Open',
   planning: 'Planning',
-  implementing: 'Implementing',
-  reviewing: 'In review',
+  executing: 'Executing',
+  review: 'In review',
   changes: 'Changes requested',
-  merged: 'Merged',
-  failed: 'Failed',
+  converged: 'Converged',
+  abandoned: 'Abandoned',
 };
 
 /** Statuses where agents are actively producing turns. */
 export const LIVE_STATUSES: ReadonlySet<ProjectStatus> = new Set([
+  'open',
   'planning',
-  'implementing',
-  'reviewing',
+  'executing',
+  'review',
   'changes',
 ]);
 

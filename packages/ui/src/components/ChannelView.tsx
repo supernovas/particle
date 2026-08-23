@@ -1,6 +1,6 @@
 import { useEffect, useRef } from 'react';
 import type { Channel, Message, Project } from '../types';
-import { ACTORS } from '../data';
+import { useActors } from '../actors';
 import { Avatar } from './Avatar';
 import { Composer } from './Composer';
 import { ProjectCard } from './ProjectCard';
@@ -11,7 +11,9 @@ interface ChannelViewProps {
   projects: Record<string, Project>;
   selectedProjectId: string | null;
   onOpenProject: (id: string) => void;
-  onSend: (text: string) => void;
+  /** Free-form chat when set; otherwise `startNote` explains how work starts. */
+  onSend?: (text: string) => void;
+  startNote?: { href: string; label: string };
 }
 
 function MessageRow({
@@ -25,13 +27,14 @@ function MessageRow({
   selected: boolean;
   onOpenProject: (id: string) => void;
 }) {
-  const author = ACTORS[message.authorId];
+  const actor = useActors();
+  const author = actor(message.authorId);
   return (
     <div className="msg">
       <Avatar actor={author} size={30} />
       <div className="msg-main">
         <div className="msg-head">
-          <span className="msg-name">{author.kind === 'human' ? author.name : author.name}</span>
+          <span className="msg-name">{author.name}</span>
           {author.kind !== 'human' ? <span className="badge">{author.kind}</span> : null}
           <span className="msg-time">{message.time}</span>
         </div>
@@ -73,6 +76,7 @@ export function ChannelView(props: ChannelViewProps) {
         <div className="day-divider">
           <span>Today</span>
         </div>
+        {props.messages.length === 0 ? <p className="empty-line">Nothing here yet.</p> : null}
         {props.messages.map((m) => (
           <MessageRow
             key={m.id}
@@ -84,11 +88,22 @@ export function ChannelView(props: ChannelViewProps) {
         ))}
       </div>
 
-      <Composer
-        placeholder={`Message #${props.channel.name} — a prompt starts a project`}
-        hint="Enter to send · Shift+Enter for a new line"
-        onSend={props.onSend}
-      />
+      {props.onSend ? (
+        <Composer
+          placeholder={`Message #${props.channel.name} — a prompt starts a project`}
+          hint="Enter to send · Shift+Enter for a new line"
+          onSend={props.onSend}
+        />
+      ) : props.startNote ? (
+        <div className="composer">
+          <div className="composer-note">
+            {props.startNote.label}{' '}
+            <a href={props.startNote.href} target="_blank" rel="noreferrer">
+              Open an issue ↗
+            </a>
+          </div>
+        </div>
+      ) : null}
     </section>
   );
 }

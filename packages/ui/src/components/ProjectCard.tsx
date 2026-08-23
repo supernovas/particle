@@ -1,5 +1,5 @@
 import type { Project } from '../types';
-import { ACTORS } from '../data';
+import { useActors } from '../actors';
 import { Facepile } from './Avatar';
 import { StatusChip } from './StatusChip';
 
@@ -10,9 +10,10 @@ interface ProjectCardProps {
 }
 
 export function ProjectCard({ project, active, onOpen }: ProjectCardProps) {
+  const actor = useActors();
   const done = project.tasks.filter((t) => t.state === 'done').length;
   const total = project.tasks.length;
-  const watchers = project.watchers.map((id) => ACTORS[id]).filter(Boolean);
+  const watchers = project.watchers.map((id) => actor(id));
 
   return (
     <button className={`project-card${active ? ' active' : ''}`} onClick={onOpen}>
@@ -26,7 +27,7 @@ export function ProjectCard({ project, active, onOpen }: ProjectCardProps) {
           <span
             style={{
               width: `${(done / total) * 100}%`,
-              background: project.status === 'merged' ? 'var(--st-merged)' : undefined,
+              background: project.status === 'converged' ? 'var(--st-converged)' : undefined,
             }}
           />
         </div>
@@ -39,7 +40,7 @@ export function ProjectCard({ project, active, onOpen }: ProjectCardProps) {
             <b className="del">−{project.diff.deletions}</b> · round {project.round}
           </span>
         ) : (
-          <span>The planner is drafting the plan…</span>
+          <span>No tasks yet</span>
         )}
         <span className="pc-spacer" />
         <Facepile actors={watchers} size={16} />
