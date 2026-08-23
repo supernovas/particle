@@ -57,13 +57,41 @@ automatic once the record resolves.
 
 ## Agent execution
 
-The checked-in `particle.yaml` deliberately leaves `runner.command` unset. Production therefore
-does not launch agents until an operator provisions a headless agent CLI plus its authentication
-and configures the documented command in `docs/runners/codex.md`. The TypeScript service keeps
-credentials in `/opt/particle/state`; configured agents run only in owned task worktrees and never
-receive that secret directory. The canonical `particle-worker` service still starts the Phase-0
-Rust daemon, so switching service ownership to the integrated TypeScript scheduler remains a
-separate deployment change.
+Production pins Node 22 and `@openai/codex` 0.149.0, then runs the integrated TypeScript poller,
+Git ref store, scheduler, and subprocess runner as `particle-worker --no-serve`. The Rust binary is
+still built and installed for parity checks, but its unit is deliberately disabled: there is one
+polling owner and therefore no double ingestion or delivery. The UI process is an observer started
+with `--no-poll --no-schedule`.
+
+Deployment fails closed until the `particle` user has valid file-backed Codex authentication at
+`/opt/particle/credentials/codex`. The credential directory, durable state, bare host repository,
+deploy checkout, and task worktrees are separate roots. Agent commands inherit neither GitHub App
+credentials nor the Codex credential path; Codex shell commands get a worktree-local `HOME`, a
+minimal `PATH`, and no network access. The service uses `KillMode=control-group` so a redeploy stops
+the full agent process tree.
+
+After applying this startup metadata and rebooting once, provision auth by streaming an API key
+from a private local file over SSH (the value is never in argv, an environment variable, logs, or
+Terraform state):
+
+```sh
+gcloud compute ssh particle-worker-0 --zone us-central1-a \
+  --project particle-production-506421 \
+  --command 'sudo -u particle env HOME=/home/particle CODEX_HOME=/opt/particle/credentials/codex /opt/particle/bin/particle-codex-auth login' \
+  </secure/path/openai-api-key
+```
+
+Then retry the staged cutover:
+
+```sh
+gcloud compute ssh particle-worker-0 --zone us-central1-a \
+  --project particle-production-506421 \
+  --command 'sudo systemctl start particle-redeploy && sudo systemctl --no-pager status particle-worker'
+```
+
+Secret Manager bootstrap for this credential remains a follow-up requiring an explicitly approved
+worker-service-account access grant. The commands above are the narrow operator path in the
+meantime; `docs/runners/codex.md` documents the runtime boundary.
 
 ## CI runners (self-hosted GitHub Actions)
 

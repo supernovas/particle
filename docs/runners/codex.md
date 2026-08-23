@@ -1,8 +1,8 @@
 # Codex CLI runner
 
-Particle can run Codex non-interactively while reusing the operator's existing ChatGPT OAuth login.
-Run the worker as the same operating-system user that ran `codex login`, and preserve that user's
-`HOME`. If `CODEX_HOME` was set during login, preserve the same absolute `CODEX_HOME` for the worker.
+Particle can run Codex non-interactively with a dedicated file-backed login. Run the worker as the
+same operating-system user that ran `codex login`, and preserve that user's `HOME`. If `CODEX_HOME`
+was set during login, preserve the same absolute `CODEX_HOME` for the worker.
 Verify the service account before starting Particle:
 
 ```sh
@@ -16,26 +16,30 @@ access that keyring. See the official [Codex authentication documentation][auth]
 
 [auth]: https://learn.chatgpt.com/docs/auth#credential-storage
 
-Use this direct command template in `particle.yaml`:
+The production command template is checked into `particle.yaml`. Its important boundaries are:
 
 ```yaml
 runner:
   command:
-    - codex
+    - /opt/particle/tools/bin/codex
     - exec
     - --ephemeral
+    - --ignore-user-config
     - --sandbox
     - workspace-write
     - -c
     - 'approval_policy="never"'
+    - -c
+    - 'shell_environment_policy.inherit="none"'
     - Read and follow the complete role instructions in {prompt}.
   timeout-seconds: 900
 ```
 
 `codex exec` is the CLI's non-interactive mode. Particle sets the subprocess working directory to
 the task workspace and replaces `{prompt}` with the rendered prompt's absolute path. `--ephemeral`
-avoids persisting a Codex session; it does not bypass authentication or the workspace sandbox. The
-command is an argv array and is never evaluated by a shell.
+avoids persisting a Codex session; it does not bypass authentication or the workspace sandbox.
+Production keeps network access disabled and prevents login shells. The command is an argv array
+and is never evaluated by a shell.
 
 ## Secret boundary
 
