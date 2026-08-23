@@ -167,7 +167,7 @@ function projectStatus(value: unknown, path: string): void {
   const data = object(value, path);
   oneOf(
     data.status,
-    ['open', 'planning', 'executing', 'review', 'converged', 'abandoned'],
+    ['open', 'planning', 'executing', 'review', 'paused', 'converged', 'abandoned'],
     `${path}.status`,
   );
 }

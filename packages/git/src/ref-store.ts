@@ -290,6 +290,17 @@ export class RefStore {
       return;
     }
     if (localSha === remoteSha) return;
+    // The view is a replaceable cache, not an append-only actor history. A
+    // remote materialization with a different octopus parent set therefore
+    // supersedes the local cache even when neither commit is an ancestor.
+    if (ref.endsWith('/view')) {
+      try {
+        await run(this.gitDir, ['update-ref', ref, remoteSha, localSha]);
+      } catch (error) {
+        throw new StaleRefError(ref, error);
+      }
+      return;
+    }
     if (await this.isAncestor(remoteSha, localSha)) return;
     if (await this.isAncestor(localSha, remoteSha)) {
       try {

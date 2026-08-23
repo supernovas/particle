@@ -5,11 +5,17 @@ import { promisify } from 'node:util';
 import { execFile } from 'node:child_process';
 import { afterEach, describe, expect, it } from 'vitest';
 import {
+  canonicalJson,
+  compareEvents,
+  fold,
+  stateToJson,
   type ActorId,
   type EventType,
   type ParticleEvent,
   type ProjectCreated,
 } from '@particle/core';
+import { CASES } from '../../../spec/cases.ts';
+import { referenceViewSha } from '../../../spec/codec.ts';
 import { RefStore, StaleRefError } from '../src/index.ts';
 
 const exec = promisify(execFile);
@@ -63,6 +69,55 @@ async function clone(origin: string, name: string): Promise<string> {
 }
 
 describe('RefStore', () => {
+  it('matches the normative octopus view recipe and parent-ref ordering', async () => {
+    const fixture = CASES.find(({ name }) => name === 'octopus-determinism')!;
+    const gitDir = await bare('octopus-parity');
+    const store = new RefStore({ gitDir });
+    const createdEvent = fixture.events.find(
+      ({ type }) => type === 'project.created',
+    )! as ParticleEvent<ProjectCreated>;
+    await store.createProject(createdEvent);
+    const byActor = new Map<ActorId, ParticleEvent[]>();
+    for (const item of fixture.events) {
+      if (item.type === 'project.created') continue;
+      const actorEvents = byActor.get(item.actor);
+      if (actorEvents) actorEvents.push(item);
+      else byActor.set(item.actor, [item]);
+    }
+    for (const [actor, actorEvents] of byActor) {
+      await store.append(createdEvent.project, actor, actorEvents);
+    }
+
+    const { stdout: refs } = await exec('git', [
+      '--git-dir',
+      gitDir,
+      'for-each-ref',
+      '--format=%(refname) %(objectname)',
+      `refs/particle/${createdEvent.project}/actors/`,
+    ]);
+    const parents = refs
+      .trim()
+      .split('\n')
+      .filter(Boolean)
+      .map((line) => {
+        const [ref, sha] = line.split(' ');
+        return { ref: ref!, sha: sha! };
+      });
+    const ordered = [...fixture.events].sort(compareEvents);
+    const stateJson = canonicalJson(stateToJson(fold(createdEvent.project, ordered)));
+    const expected = referenceViewSha({
+      project: createdEvent.project,
+      events: ordered,
+      stateJson,
+      parents,
+      canonicalJson,
+    });
+
+    await expect(store.materialize(createdEvent.project)).resolves.toMatchObject({
+      sha: expected,
+    });
+  });
+
   it('creates a project and appends a cumulative actor log without a worktree', async () => {
     const gitDir = await bare('append');
     const store = new RefStore({ gitDir });

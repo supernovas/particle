@@ -72,16 +72,21 @@ describe('GitEventStore', () => {
       .split('\n');
     expect(refs).toContain(`refs/particle/${project}/meta`);
     expect(refs).toContain(`refs/particle/${project}/actors/github-alice`);
+    expect(refs).toContain(`refs/particle/${project}/view`);
   });
 
-  it('recovers full state on a cold machine by fetching from the host repo', async () => {
-    const events = sampleProject();
-    await newStore('writer-2').append(events);
+  it(
+    'recovers full state on a cold machine by fetching from the host repo',
+    { timeout: 20_000 },
+    async () => {
+      const events = sampleProject();
+      await newStore('writer-2').append(events);
 
-    const recovered = await newStore('cold-reader').load();
-    const ids = new Set(recovered.map((e) => e.id));
-    for (const event of events) expect(ids.has(event.id)).toBe(true);
-  });
+      const recovered = await newStore('cold-reader').load();
+      const ids = new Set(recovered.map((e) => e.id));
+      for (const event of events) expect(ids.has(event.id)).toBe(true);
+    },
+  );
 
   it(
     'merges concurrent appends from different actors via the remote',

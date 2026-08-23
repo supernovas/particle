@@ -4,7 +4,11 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { promisify } from 'node:util';
 import { afterEach, describe, expect, it } from 'vitest';
-import { createTaskWorktree, removeTaskWorktree } from '../src/worktrees.ts';
+import {
+  createTaskWorktree,
+  getOrCreateTaskWorktree,
+  removeTaskWorktree,
+} from '../src/worktrees.ts';
 
 const exec = promisify(execFile);
 const roots: string[] = [];
@@ -14,6 +18,22 @@ afterEach(async () => {
 });
 
 describe('task worktrees', () => {
+  it('reuses the same owned worktree across task attempts', async () => {
+    const repoDir = await mkdtemp(join(tmpdir(), 'particle-worktrees-reuse-'));
+    roots.push(repoDir);
+    await exec('git', ['init', '-b', 'main', repoDir]);
+    await exec('git', ['-C', repoDir, 'config', 'user.name', 'particle']);
+    await exec('git', ['-C', repoDir, 'config', 'user.email', 'particle@supernova.ai']);
+    await writeFile(join(repoDir, 'README.md'), 'particle\n');
+    await exec('git', ['-C', repoDir, 'add', 'README.md']);
+    await exec('git', ['-C', repoDir, 'commit', '-m', 'init']);
+
+    const first = await getOrCreateTaskWorktree(repoDir, 'prj_demo', 'tsk_demo');
+    roots.push(first);
+    const second = await getOrCreateTaskWorktree(repoDir, 'prj_demo', 'tsk_demo');
+    expect(second).toBe(first);
+  });
+
   it('creates an isolated task branch from the default branch and disposes both', async () => {
     const repoDir = await mkdtemp(join(tmpdir(), 'particle-worktrees-'));
     roots.push(repoDir);

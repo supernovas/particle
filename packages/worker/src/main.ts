@@ -1,5 +1,6 @@
 import { chmodSync, writeFileSync } from 'node:fs';
 import { resolve } from 'node:path';
+import { getOrCreateTaskWorktree } from '@particle/git';
 import {
   fold,
   isConverged,
@@ -17,6 +18,9 @@ import { InstallationTokenProvider, loadAppCreds } from './github/auth.ts';
 import { serializeWorkspace } from './serialize.ts';
 import { startServer, type UiServer } from './server.ts';
 import { openStore } from './store.ts';
+import { defaultRules } from './rules.ts';
+import { DEFAULT_BUDGETS, Scheduler, type AgentRunContext, type AgentRunner } from './scheduler.ts';
+import { SubprocessRunner } from './runner/index.ts';
 
 const STATE_DIR = process.env.PARTICLE_STATE_DIR ?? '.particle';
 const CURSOR_PATH = `${STATE_DIR}/cursor.json`;
@@ -48,6 +52,12 @@ function setupGitPushAuth(tokens: InstallationTokenProvider): () => Promise<void
   };
 }
 
+class NoopRunner implements AgentRunner {
+  async start(ctx: AgentRunContext) {
+    console.log(`[${ctx.project}] ${ctx.role}${ctx.taskId ? `(${ctx.taskId})` : ''} queued`);
+    return { events: [], exitCode: 0, transcriptPath: '' };
+  }
+}
 function lastClock(log: ProjectLog): Clock | undefined {
   return log.events.at(-1)?.clock;
 }
@@ -98,7 +108,8 @@ function messageToEvents(
 
 async function main() {
   const once = process.argv.includes('--once');
-  const config = loadConfig();
+  const noPoll = process.argv.includes('--no-poll');
+  const config = loadConfig(process.env.PARTICLE_CONFIG ?? 'particle.yaml');
   const creds = loadAppCreds(STATE_DIR);
   const [owner] = config.host.repo.split('/');
   const tokens = new InstallationTokenProvider(creds, owner!);
@@ -108,7 +119,7 @@ async function main() {
     creds.slug,
     CURSOR_PATH,
   );
-  const journal = openStore(STATE_DIR, {
+  const store = openStore(STATE_DIR, {
     hostRepo: config.host.repo,
     beforeSync: process.env.PARTICLE_STORE === 'git' ? setupGitPushAuth(tokens) : undefined,
   });
@@ -117,7 +128,7 @@ async function main() {
   console.log(`particle-worker v0 — host ${config.host.repo}, app ${creds.slug} (#${creds.id})`);
 
   const projects = new Map<string, ProjectLog>();
-  for (const event of await journal.load()) {
+  for (const event of await store.load()) {
     if (event.type === 'project.created') {
       const source = (event.data as ProjectCreated).source;
       if (source.kind === 'github-issue') {
@@ -133,7 +144,7 @@ async function main() {
     }
   }
   if (projects.size > 0) {
-    console.log(`replayed journal: ${projects.size} project(s)`);
+    console.log(`replayed store: ${projects.size} project(s)`);
   }
 
   let server: UiServer | undefined;
@@ -156,7 +167,7 @@ async function main() {
             data: { body },
           };
           log.events.push(event);
-          await journal.append([event]);
+          await store.append([event]);
           server?.broadcast();
           if (config.channels.githubIssues.mirror) {
             const state = fold(log.id, log.events);
@@ -173,6 +184,41 @@ async function main() {
     console.log(`ui: http://localhost:${port} (api + events; dist served when built)`);
   }
 
+  const runner = config.runner.command
+    ? new SubprocessRunner(config.runner.command, {
+        timeoutMs: config.runner.timeoutSeconds * 1000,
+      })
+    : new NoopRunner();
+  if (!config.runner.command) {
+    console.warn(
+      'runner.command is absent; polling remains active but agent scheduling is disabled',
+    );
+  }
+  let worktreeSetup: Promise<void> = Promise.resolve();
+  const scheduler = new Scheduler(defaultRules, runner, DEFAULT_BUDGETS, {
+    async append(events) {
+      await store.append(events);
+      for (const event of events) {
+        const log = [...projects.values()].find((candidate) => candidate.id === event.project);
+        if (log && !log.events.some((existing) => existing.id === event.id)) log.events.push(event);
+      }
+    },
+    workdir(request) {
+      const task = request.taskId ?? request.role;
+      const next = worktreeSetup.then(() =>
+        getOrCreateTaskWorktree(
+          process.env.PARTICLE_REPO_DIR ?? process.cwd(),
+          request.project,
+          task,
+        ),
+      );
+      worktreeSetup = next.then(
+        () => undefined,
+        () => undefined,
+      );
+      return next;
+    },
+  });
   let stopping = false;
   let wake: (() => void) | undefined;
   const stop = () => {
@@ -186,8 +232,9 @@ async function main() {
 
   do {
     try {
-      const messages = await channel.poll();
-      const touched = new Set<string>();
+      const messages = noPoll ? [] : await channel.poll();
+      // Re-evaluate replayed projects too: durable log evidence makes every tick idempotent.
+      const touched = new Set(projects.keys());
       const fresh: ParticleEvent[] = [];
       for (const message of messages) {
         let log = projects.get(message.projectKey);
@@ -199,7 +246,7 @@ async function main() {
         fresh.push(...messageToEvents(log, message, config.channels.githubIssues.repo, isNew));
         touched.add(message.projectKey);
       }
-      await journal.append(fresh);
+      await store.append(fresh);
       if (fresh.length > 0) server?.broadcast();
       if (config.channels.githubIssues.mirror) {
         for (const log of projects.values()) {
@@ -212,6 +259,14 @@ async function main() {
       }
       for (const key of touched) {
         const log = projects.get(key)!;
+        // Runner output is itself an event edge. Keep folding until no rule emits anything.
+        if (config.runner.command) {
+          for (;;) {
+            const before = log.events.length;
+            await scheduler.tick(fold(log.id, log.events));
+            if (log.events.length === before) break;
+          }
+        }
         const state = fold(log.id, log.events);
         const tasks = Object.values(state.tasks);
         console.log(

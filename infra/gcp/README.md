@@ -55,6 +55,16 @@ DNS is on Cloudflare: create an A record `particle` → `web_ip` with proxying *
 (grey cloud); Caddy needs to answer the ACME challenge directly. Certificate issuance is
 automatic once the record resolves.
 
+## Agent execution
+
+The checked-in `particle.yaml` deliberately leaves `runner.command` unset. Production therefore
+does not launch agents until an operator provisions a headless agent CLI plus its authentication
+and configures the documented command in `docs/runners/codex.md`. The TypeScript service keeps
+credentials in `/opt/particle/state`; configured agents run only in owned task worktrees and never
+receive that secret directory. The canonical `particle-worker` service still starts the Phase-0
+Rust daemon, so switching service ownership to the integrated TypeScript scheduler remains a
+separate deployment change.
+
 ## CI runners (self-hosted GitHub Actions)
 
 `runners.tf` adds `runner_count` (default 1) org-level self-hosted runner VMs
