@@ -1,0 +1,20 @@
+# Workspace configuration. This repo is its own host workspace.
+host:
+  repo: supernovas/particle
+
+channels:
+  github-issues:
+    repo: supernovas/particle
+    # Issues carrying this label become particle projects…
+    label: particle:project
+    # …plus these, grandfathered in (the founding thread).
+    seed-issues: [1]
+    poll-interval-seconds: 15
+    # When true, agent messages are mirrored back to the issue as comments.
+    mirror: false
+
+runner:
+  # Bring your own headless agent CLI; the reference setup is codex reusing the
+  # operator's OAuth login. Command template placeholders: {prompt}, {workdir}.
+  #   command: ["codex", "exec", "{prompt}"]
+  command: null
