@@ -29,12 +29,17 @@ terraform output -raw logs_hint   # prints the journalctl ssh one-liner
 
 ## Deploys (gitops, zero downtime)
 
-Merging to `main` is the deploy. A converge timer on the VM (60s) notices the new sha and
-runs a **staged** rebuild — rust and the UI compile in `*.new` dirs while the old build
-keeps serving, then a seconds-long cutover swaps them, which Caddy bridges with
-`lb_try_duration` so clients never see it (SSE streams auto-reconnect). Logs:
+Merging to `main` is the deploy. The app's webhook delivers the push event to
+`https://particle.supernova.ai/hooks/github` (~1s after merge); an HMAC-verified listener
+kicks `particle-redeploy`, which runs a **staged** rebuild — rust and the UI compile in
+`*.new` dirs while the old build keeps serving, then a seconds-long cutover swaps them,
+which Caddy bridges with `lb_try_duration` so clients never see it (SSE streams
+auto-reconnect). A 60s converge timer is the fallback for missed deliveries. Logs:
 `/var/log/particle-redeploy.log` on the VM. No workflow, no deploy credentials; the manual
 break-glass remains `terraform apply -replace=google_compute_instance.worker`.
+
+One-time app setup for the fast path (org admin): app settings → Webhook → **Active**, and
+Subscribe to events → **Push**. (The webhook URL + secret are already configured via API.)
 
 CI-built release binaries instead of on-VM builds are a known follow-up, tracked with the
 rest of Phase 3 in [#17](https://github.com/supernovas/particle/issues/17).

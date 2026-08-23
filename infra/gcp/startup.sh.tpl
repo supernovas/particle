@@ -91,6 +91,8 @@ for dir in "$SRC.new/.particle" "$STATE"; do
   fetch_secret particle-github-app-pem >"$dir/github-app.private-key.pem"
   chmod 600 "$dir"/github-app.*
 done
+fetch_secret particle-github-webhook-secret >"$STATE/webhook-secret"
+chmod 600 "$STATE/webhook-secret"
 chown -R particle:particle "$SRC.new" "$APP.new" "$STATE"
 
 # Cutover: seconds; Caddy buffers requests across the restart window.
@@ -153,7 +155,7 @@ UNIT
 
 cat >/etc/systemd/system/particle-redeploy.timer <<'UNIT'
 [Unit]
-Description=particle converge-on-main every minute
+Description=particle converge-on-main fallback (webhook is the fast path)
 
 [Timer]
 OnBootSec=90
@@ -163,18 +165,71 @@ OnUnitActiveSec=60
 WantedBy=timers.target
 UNIT
 
+# The fast path: GitHub delivers push events here (~1s after a merge). The
+# listener verifies the app webhook's HMAC and kicks particle-redeploy.
+cat >/opt/particle/bin/particle-hooks.py <<'HOOKS'
+#!/usr/bin/env python3
+import hashlib, hmac, json, subprocess
+from http.server import BaseHTTPRequestHandler, HTTPServer
+
+SECRET = open('/opt/particle/state/webhook-secret', 'rb').read().strip()
+
+class Handler(BaseHTTPRequestHandler):
+    def do_POST(self):
+        if self.path != '/hooks/github':
+            self.send_response(404); self.end_headers(); return
+        body = self.rfile.read(int(self.headers.get('content-length', 0) or 0))
+        sig = self.headers.get('x-hub-signature-256', '')
+        expected = 'sha256=' + hmac.new(SECRET, body, hashlib.sha256).hexdigest()
+        if not hmac.compare_digest(sig, expected):
+            self.send_response(401); self.end_headers(); return
+        try:
+            payload = json.loads(body)
+        except Exception:
+            payload = {}
+        if self.headers.get('x-github-event') == 'push' and payload.get('ref') == 'refs/heads/${branch}':
+            subprocess.Popen(['systemctl', 'start', '--no-block', 'particle-redeploy'])
+        self.send_response(202); self.end_headers(); self.wfile.write(b'ok')
+
+    def log_message(self, *args):
+        pass
+
+HTTPServer(('127.0.0.1', 7456), Handler).serve_forever()
+HOOKS
+chmod 0755 /opt/particle/bin/particle-hooks.py
+
+cat >/etc/systemd/system/particle-hooks.service <<'UNIT'
+[Unit]
+Description=particle github webhook listener
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+ExecStart=/usr/bin/python3 /opt/particle/bin/particle-hooks.py
+Restart=always
+RestartSec=5
+
+[Install]
+WantedBy=multi-user.target
+UNIT
+
 # Public read-only: browsing and the live event stream work for anyone, but
 # nothing that appends events is reachable until identity lands (Phase 2).
 # lb_try_duration bridges the redeploy cutover so clients never see it.
 cat >/etc/caddy/Caddyfile <<CADDY
 ${web_domain} {
-	@writes {
-		method POST PUT PATCH DELETE
+	handle /hooks/github {
+		reverse_proxy 127.0.0.1:7456
 	}
-	respond @writes "read-only deployment" 403
-	reverse_proxy 127.0.0.1:7455 {
-		lb_try_duration 20s
-		lb_try_interval 250ms
+	handle {
+		@writes {
+			method POST PUT PATCH DELETE
+		}
+		respond @writes "read-only deployment" 403
+		reverse_proxy 127.0.0.1:7455 {
+			lb_try_duration 20s
+			lb_try_interval 250ms
+		}
 	}
 }
 CADDY
@@ -184,4 +239,6 @@ systemctl enable particle-worker particle-ui
 systemctl enable --now particle-redeploy.timer
 systemctl restart caddy
 /opt/particle/bin/particle-redeploy
+# After redeploy so the webhook secret exists in the state dir.
+systemctl enable --now particle-hooks
 echo "=== particle startup done $(date -Is) ==="
