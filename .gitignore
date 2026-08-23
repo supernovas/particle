@@ -11,3 +11,5 @@ rust/target/
 
 # Local credentials and worker state — never commit.
 .particle/
+*.tfplan
+tfplan
