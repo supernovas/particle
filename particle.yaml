@@ -14,8 +14,29 @@ channels:
     mirror: false
 
 runner:
-  # Bring your own headless agent CLI; the reference setup is codex reusing the
-  # operator's OAuth login. Command template placeholders: {prompt}, {workdir}.
-  # See docs/runners/codex.md for a working non-interactive command.
-  command: null
+  # Production uses the pinned Codex CLI provisioned by infra/gcp. Authentication
+  # lives outside both the deploy checkout and task worktrees. Codex itself can
+  # read that credential, but commands it launches receive only this worktree's
+  # HOME and a minimal PATH. Network remains disabled inside the workspace-write
+  # sandbox; publication stays an explicit operator step.
+  command:
+    - /opt/particle/tools/bin/codex
+    - exec
+    - --ephemeral
+    - --ignore-user-config
+    - --sandbox
+    - workspace-write
+    - -c
+    - 'approval_policy="never"'
+    - -c
+    - 'cli_auth_credentials_store="file"'
+    - -c
+    - 'allow_login_shell=false'
+    - -c
+    - 'shell_environment_policy.inherit="none"'
+    - -c
+    - 'shell_environment_policy.set.PATH="/opt/particle/tools/bin:/usr/local/bin:/usr/bin:/bin"'
+    - -c
+    - 'shell_environment_policy.set.HOME="{workdir}"'
+    - Read and follow the complete role instructions in {prompt}.
   timeout-seconds: 900

@@ -110,6 +110,7 @@ function messageToEvents(
 async function main() {
   const once = process.argv.includes('--once');
   const noPoll = process.argv.includes('--no-poll');
+  const noSchedule = process.argv.includes('--no-schedule');
   const config = loadConfig(process.env.PARTICLE_CONFIG ?? 'particle.yaml');
   const creds = loadAppCreds(STATE_DIR);
   const [owner] = config.host.repo.split('/');
@@ -263,7 +264,7 @@ async function main() {
       for (const key of touched) {
         const log = projects.get(key)!;
         // Runner output is itself an event edge. Keep folding until no rule emits anything.
-        if (config.runner.command) {
+        if (config.runner.command && !noSchedule) {
           for (;;) {
             const before = log.events.length;
             await scheduler.tick(fold(log.id, log.events));
