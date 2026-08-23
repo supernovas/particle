@@ -30,6 +30,16 @@ export interface TaskState {
   deps: string[];
   status: 'open' | 'claimed' | 'in_progress' | 'blocked' | 'done';
   assignee?: ActorId;
+  /** Canonical fold position of the most recent task update. */
+  updatedOrder?: number;
+}
+
+export interface AgentRunState {
+  actor: ActorId;
+  role: 'planner' | 'implementer' | 'reviewer';
+  taskId?: string;
+  /** The role emitted at least one result event after its start marker. */
+  completed: boolean;
 }
 
 export interface ProjectState {
@@ -43,12 +53,16 @@ export interface ProjectState {
   tasks: Record<string, TaskState>;
   /** Latest review request in canonical event order. */
   reviewRequested?: ReviewRequested;
-  lastReview?: { verdict: ReviewPosted['verdict']; by: ActorId; at: string };
+  lastReview?: { verdict: ReviewPosted['verdict']; by: ActorId; at: string; order: number };
   artifacts: ArtifactLinked[];
+  /** Durable scheduler evidence, derived from agent-authored events in the log. */
+  agentRuns: AgentRunState[];
   /** Highest lamport clock folded in. */
   clock: number;
   /** Ids of all folded events, for dedupe and causal parents. */
   seen: Set<string>;
+  /** Last event in canonical order, used as the causal parent for worker events. */
+  lastEventId?: string;
 }
 
 export function emptyState(projectId: string): ProjectState {
@@ -61,6 +75,7 @@ export function emptyState(projectId: string): ProjectState {
     // `constructor` or the `__proto__` setter masquerade as stored tasks.
     tasks: Object.create(null) as Record<string, TaskState>,
     artifacts: [],
+    agentRuns: [],
     clock: 0,
     seen: new Set(),
   };
@@ -75,7 +90,7 @@ export function emptyState(projectId: string): ProjectState {
 export function fold(projectId: string, events: Iterable<ParticleEvent>): ProjectState {
   const sorted = [...events].sort(compareEvents);
   const state = emptyState(projectId);
-  for (const event of sorted) apply(state, event);
+  for (const event of sorted) apply(state, event, state.seen.size);
   return state;
 }
 
@@ -95,10 +110,13 @@ export function foldMany(events: Iterable<ParticleEvent>): Map<string, ProjectSt
   return states;
 }
 
-function apply(state: ProjectState, event: ParticleEvent): void {
+function apply(state: ProjectState, event: ParticleEvent, order: number): void {
   if (event.project !== state.id || state.seen.has(event.id)) return;
   state.seen.add(event.id);
+  state.lastEventId = event.id;
   if (event.clock.lamport > state.clock) state.clock = event.clock.lamport;
+
+  recordAgentRun(state, event);
 
   switch (event.type) {
     case 'project.created': {
@@ -149,12 +167,33 @@ function apply(state: ProjectState, event: ParticleEvent): void {
     case 'task.updated': {
       const data = event.data as TaskUpdated;
       const task = state.tasks[data.taskId];
-      if (task && event.actor === task.assignee) task.status = data.status;
+      if (task && event.actor === task.assignee) {
+        task.status = data.status;
+        task.updatedOrder = order;
+      }
       break;
     }
     case 'review.posted': {
       const data = event.data as ReviewPosted;
-      state.lastReview = { verdict: data.verdict, by: event.actor, at: event.clock.wall };
+      state.lastReview = {
+        verdict: data.verdict,
+        by: event.actor,
+        at: event.clock.wall,
+        order,
+      };
+      if (data.verdict === 'request_changes') {
+        const requested = new Set(
+          data.comments.flatMap((comment) => (comment.taskId ? [comment.taskId] : [])),
+        );
+        const tasks = Object.values(state.tasks);
+        const reopen = requested.size > 0 ? tasks.filter((task) => requested.has(task.id)) : tasks;
+        for (const task of reopen) {
+          if (task.status === 'done') {
+            task.status = 'open';
+            task.updatedOrder = order;
+          }
+        }
+      }
       break;
     }
     case 'review.requested': {
@@ -175,6 +214,32 @@ function apply(state: ProjectState, event: ParticleEvent): void {
   }
 }
 
+function recordAgentRun(state: ProjectState, event: ParticleEvent): void {
+  const match = /^agent:(planner|implementer|reviewer)\/(.+)$/.exec(event.actor);
+  if (!match) return;
+  const role = match[1] as AgentRunState['role'];
+  const taskId =
+    role === 'implementer' &&
+    (event.type === 'task.claimed' || event.type === 'task.updated') &&
+    typeof (event.data as { taskId?: unknown }).taskId === 'string'
+      ? ((event.data as { taskId: string }).taskId ?? undefined)
+      : undefined;
+  const existing = state.agentRuns.find((run) => run.actor === event.actor);
+  const completed =
+    (role === 'planner' &&
+      (event.type === 'plan.proposed' ||
+        event.type === 'task.created' ||
+        event.type === 'message.posted')) ||
+    (role === 'implementer' && event.type === 'task.updated') ||
+    (role === 'reviewer' && (event.type === 'review.posted' || event.type === 'message.posted'));
+  if (existing) {
+    if (taskId && !existing.taskId) existing.taskId = taskId;
+    if (completed) existing.completed = true;
+    return;
+  }
+  state.agentRuns.push({ actor: event.actor, role, completed, ...(taskId ? { taskId } : {}) });
+}
+
 /**
  * A project has reached its fixed point when every task is done and the most
  * recent review approves.
@@ -183,11 +248,27 @@ export function isConverged(state: ProjectState): boolean {
   const tasks = Object.values(state.tasks);
   if (tasks.length === 0) return false;
   if (!tasks.every((t) => t.status === 'done')) return false;
-  return state.lastReview?.verdict === 'approve';
+  if (state.lastReview?.verdict !== 'approve') return false;
+  const lastDone = Math.max(...tasks.map((task) => task.updatedOrder ?? -1));
+  return state.lastReview.order > lastDone;
 }
 
-/** JSON-compatible ProjectState used as the materialized state.json shape. */
-export interface ProjectStateJson extends Omit<ProjectState, 'seen'> {
+/** SPEC-visible task shape; scheduler-only ordering evidence stays runtime-only. */
+export type TaskStateJson = Omit<TaskState, 'updatedOrder'>;
+
+/** JSON-compatible SPEC state used as the materialized state.json shape. */
+export interface ProjectStateJson {
+  id: string;
+  title: string;
+  status: ProjectStatusChanged['status'];
+  source?: ProjectSource;
+  plan?: PlanProposed;
+  messages: MessageState[];
+  tasks: Record<string, TaskStateJson>;
+  reviewRequested?: ReviewRequested;
+  lastReview?: { verdict: ReviewPosted['verdict']; by: ActorId; at: string };
+  artifacts: ArtifactLinked[];
+  clock: number;
   seen: string[];
 }
 
@@ -205,12 +286,23 @@ export function stateToJson(state: ProjectState): ProjectStateJson {
       : { plan: { summary: state.plan.summary, taskIds: [...state.plan.taskIds] } }),
     messages: state.messages.map((message) => ({ ...message })),
     tasks: Object.fromEntries(
-      Object.entries(state.tasks).map(([id, task]) => [id, { ...task, deps: [...task.deps] }]),
+      Object.entries(state.tasks).map(([id, task]) => {
+        const { updatedOrder: _updatedOrder, ...visible } = task;
+        return [id, { ...visible, deps: [...visible.deps] }];
+      }),
     ),
     ...(state.reviewRequested === undefined
       ? {}
       : { reviewRequested: { taskIds: [...state.reviewRequested.taskIds] } }),
-    ...(state.lastReview === undefined ? {} : { lastReview: { ...state.lastReview } }),
+    ...(state.lastReview === undefined
+      ? {}
+      : {
+          lastReview: {
+            verdict: state.lastReview.verdict,
+            by: state.lastReview.by,
+            at: state.lastReview.at,
+          },
+        }),
     artifacts: state.artifacts.map((artifact) => ({ ...artifact })),
     clock: state.clock,
     seen: [...state.seen].sort(),

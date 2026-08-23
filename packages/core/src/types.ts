@@ -105,5 +105,5 @@ export interface ArtifactLinked {
 }
 
 export interface ProjectStatusChanged {
-  status: 'open' | 'planning' | 'executing' | 'review' | 'converged' | 'abandoned';
+  status: 'open' | 'planning' | 'executing' | 'review' | 'paused' | 'converged' | 'abandoned';
 }

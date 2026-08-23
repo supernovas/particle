@@ -79,7 +79,7 @@ describe('serializeWorkspace', () => {
     expect(project.status).toBe('changes');
     expect(project.round).toBe(1);
     expect(project.tasks).toEqual([
-      { id: 'tsk_a', title: 'Quarantine', state: 'done', assignee: 'agent:impl/run_2' },
+      { id: 'tsk_a', title: 'Quarantine', state: 'queued', assignee: 'agent:impl/run_2' },
       { id: 'tsk_b', title: 'Fix races', state: 'queued', assignee: undefined },
     ]);
     expect(project.watchers).toEqual(['github:ada']);

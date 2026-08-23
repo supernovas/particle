@@ -63,7 +63,8 @@ a worker crash/restart never double-spawns an agent.
    log or in flight → start the remainder via `AgentRunner`, recording a `task.claimed` (or
    role-run marker event) _before_ starting the process.
 3. Restructure `main.ts`: poll channels → append events → fold → `tick` each touched
-   project → repeat. Keep `--once`.
+   project → repeat. Keep `--once`; `--no-poll` may be combined with it for an offline
+   daemon bootstrap smoke test that performs no channel reads.
 4. Simulation tests with a fake runner that scripts agent behavior (e.g. planner emits two
    tasks; implementers complete; reviewer rejects once then approves) — assert the project
    converges within budget and that replaying the same log causes zero new runs.
@@ -79,3 +80,12 @@ a worker crash/restart never double-spawns an agent.
 
 Real agent CLI execution (T6), multi-worker leasing (Phase 3 — single worker owns a
 workspace in Phase 1), webhooks.
+
+## Bootstrap integration note
+
+This task remains independently runnable against the bootstrap branch by wiring the scheduler
+to the append-only `Journal` and an in-process no-op runner in `main.ts`. When the parallel
+dependencies land, replace the scheduler append hook with T3's `RefStore.append`, pass T6's
+configured `AgentRunner` (the scheduler contract is structurally compatible), and keep T4's
+`ChannelAdapter` poll/deliver calls around the same fold-to-fixed-point loop. The scheduling
+rules and durable marker events do not depend on those transport implementations.

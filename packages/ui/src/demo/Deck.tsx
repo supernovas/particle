@@ -10,7 +10,7 @@ import './deck.css';
 interface Slide {
   id: string;
   bg?: ShaderName;
-  render: (active: boolean, replay: number) => ReactNode;
+  render: (active: boolean, replay: number, theme: Theme, toggleTheme: () => void) => ReactNode;
 }
 
 function ValueSlide({
@@ -50,10 +50,10 @@ const SLIDES: Slide[] = [
   },
   {
     id: 'timelapse',
-    render: (active, replay) => (
+    render: (active, replay, theme) => (
       <div className="sl-full">
         <div className="sl-kicker sl-kicker-top">one day, replayed in its own UI</div>
-        <Timelapse active={active} run={replay} />
+        <Timelapse active={active} run={replay} theme={theme} />
       </div>
     ),
   },
@@ -70,12 +70,12 @@ const SLIDES: Slide[] = [
   },
   {
     id: 'live',
-    render: () => (
+    render: (_active, _replay, theme, toggleTheme) => (
       <div className="sl-full">
         <div className="sl-kicker sl-kicker-top">live — click around</div>
         <div className="tl">
           <Frame title="particle — workspace" interactive>
-            <MockApp offline={false} embedded />
+            <MockApp offline={false} embedded theme={theme} onToggleTheme={toggleTheme} />
           </Frame>
           <div className="tl-caption-row">
             <span className="tl-caption">the same app you just watched build itself</span>
@@ -190,7 +190,11 @@ export function Deck() {
           {slide.bg ? (
             <Shader name={slide.bg} active={i === index} light={theme === 'light'} />
           ) : null}
-          <div className="deck-content">{slide.render(i === index, replay)}</div>
+          <div className="deck-content">
+            {slide.render(i === index, replay, theme, () =>
+              setTheme((t) => (t === 'dark' ? 'light' : 'dark')),
+            )}
+          </div>
         </section>
       ))}
       <div className="deck-dots">

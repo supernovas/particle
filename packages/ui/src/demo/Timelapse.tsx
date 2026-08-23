@@ -10,7 +10,15 @@ const noop = () => undefined;
  * The 15-second self-build replay: particle's first day folded into beats,
  * rendered inside the real workspace shell with subtitles.
  */
-export function Timelapse({ active, run }: { active: boolean; run: number }) {
+export function Timelapse({
+  active,
+  run,
+  theme,
+}: {
+  active: boolean;
+  run: number;
+  theme?: 'light' | 'dark';
+}) {
   const [beat, setBeat] = useState(0);
   const [replays, setReplays] = useState(0);
 
@@ -60,6 +68,7 @@ export function Timelapse({ active, run }: { active: boolean; run: number }) {
           onCloseProject={noop}
           onSendReply={noop}
           embedded
+          theme={theme}
         />
       </Frame>
       <div className="tl-caption-row">

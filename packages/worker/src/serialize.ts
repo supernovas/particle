@@ -134,6 +134,7 @@ function uiTaskState(status: TaskState['status']): UiTask['state'] {
 }
 
 function uiStatus(state: ProjectState): UiProject['status'] {
+  if (state.status === 'paused') return 'changes';
   if (
     state.lastReview?.verdict === 'request_changes' &&
     (state.status === 'executing' || state.status === 'review')

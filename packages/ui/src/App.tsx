@@ -87,7 +87,17 @@ function LiveApp({
   );
 }
 
-export function MockApp({ offline, embedded }: { offline: boolean; embedded?: boolean }) {
+export function MockApp({
+  offline,
+  embedded,
+  theme,
+  onToggleTheme,
+}: {
+  offline: boolean;
+  embedded?: boolean;
+  theme?: 'light' | 'dark';
+  onToggleTheme?: () => void;
+}) {
   const [channelId, setChannelId] = useState('eng');
   const [projectId, setProjectId] = useState<string | null>('speed-up-ci');
   const [messages, setMessages] = useState<Message[]>(MESSAGES);
@@ -217,6 +227,8 @@ export function MockApp({ offline, embedded }: { offline: boolean; embedded?: bo
       }}
       onTogglePause={togglePause}
       embedded={embedded}
+      theme={theme}
+      onToggleTheme={onToggleTheme}
     />
   );
 }

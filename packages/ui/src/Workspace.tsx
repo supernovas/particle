@@ -46,16 +46,21 @@ export interface WorkspaceProps {
   onTogglePause?: () => void;
   /** Inside the deck: inherit the host theme, never touch document-level state. */
   embedded?: boolean;
+  /** Controlled theme (the deck owns it); with onToggleTheme, the embedded toggle drives the host. */
+  theme?: Theme;
+  onToggleTheme?: () => void;
 }
 
 export function Workspace(props: WorkspaceProps) {
-  const [theme, setTheme] = useState<Theme>(props.embedded ? 'dark' : initialTheme);
+  const [ownTheme, setOwnTheme] = useState<Theme>(props.embedded ? 'dark' : initialTheme);
+  const theme = props.theme ?? ownTheme;
+  const controlled = props.theme !== undefined;
 
   useEffect(() => {
-    if (props.embedded) return;
+    if (props.embedded || controlled) return;
     document.documentElement.dataset.theme = theme;
     window.localStorage.setItem('particle-theme', theme);
-  }, [theme, props.embedded]);
+  }, [theme, props.embedded, controlled]);
 
   const projectsById = useMemo(
     () => Object.fromEntries(props.projects.map((p) => [p.id, p])),
@@ -86,7 +91,9 @@ export function Workspace(props: WorkspaceProps) {
           modeHint={props.modeHint}
           onSelectChannel={props.onSelectChannel}
           onOpenProject={props.onJumpToProject}
-          onToggleTheme={() => setTheme(theme === 'dark' ? 'light' : 'dark')}
+          onToggleTheme={
+            props.onToggleTheme ?? (() => setOwnTheme(theme === 'dark' ? 'light' : 'dark'))
+          }
         />
         <ChannelView
           channel={channel}
