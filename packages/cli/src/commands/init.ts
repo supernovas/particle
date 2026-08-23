@@ -31,14 +31,15 @@ export async function init(args: string[], context: CommandContext): Promise<num
 
   let ok = true;
   const git = context.run('git', ['rev-parse', '--show-toplevel']);
+  const root = git.status === 0 && git.stdout.trim() !== '' ? git.stdout.trim() : context.cwd;
   if (git.status === 0) {
-    context.stdout(`ok  git repository (${git.stdout.trim()})\n`);
+    context.stdout(`ok  git repository (${root})\n`);
   } else {
     ok = false;
     context.stderr('missing  git repository (run this command inside a git worktree)\n');
   }
 
-  const configPath = join(context.cwd, 'particle.yaml');
+  const configPath = join(root, 'particle.yaml');
   try {
     loadConfig(configPath);
     context.stdout(`ok  particle.yaml\n`);
@@ -48,7 +49,7 @@ export async function init(args: string[], context: CommandContext): Promise<num
     context.stderr(`missing  particle.yaml (${detail})\n`);
   }
 
-  const stateDir = join(context.cwd, '.particle');
+  const stateDir = join(root, '.particle');
   try {
     context.stdout(`ok  GitHub App credentials (${appSlug(stateDir)})\n`);
   } catch {

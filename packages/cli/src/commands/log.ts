@@ -55,7 +55,7 @@ export async function log(args: string[], context: CommandContext): Promise<numb
     return 2;
   }
   const key = parsed.positionals[0]!;
-  const project = loadProjects(storeFor(context.cwd)).find((item) => item.key === key);
+  const project = loadProjects(storeFor(context)).find((item) => item.key === key);
   if (!project) {
     context.stderr(`particle log: project not found: ${key}\n`);
     return 1;

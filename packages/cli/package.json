@@ -8,6 +8,7 @@
   },
   "dependencies": {
     "@particle/core": "*",
-    "@particle/worker": "*"
+    "@particle/worker": "*",
+    "tsx": "^4.19.0"
   }
 }

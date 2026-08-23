@@ -1,4 +1,4 @@
-import { mkdirSync, mkdtempSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdirSync, mkdtempSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterEach, describe, expect, it } from 'vitest';
@@ -26,7 +26,7 @@ function tempRepo(): string {
   return dir;
 }
 
-function harness(cwd: string, gitName = 'alice'): Harness {
+function harness(cwd: string, gitName = 'alice', gitRoot = cwd): Harness {
   const out: string[] = [];
   const err: string[] = [];
   return {
@@ -39,7 +39,7 @@ function harness(cwd: string, gitName = 'alice'): Harness {
       now: () => new Date('2026-08-23T12:00:00.000Z'),
       run: (command, args) => {
         if (command === 'git' && args[0] === 'rev-parse') {
-          return { status: 0, stdout: `${cwd}\n`, stderr: '' };
+          return { status: 0, stdout: `${gitRoot}\n`, stderr: '' };
         }
         if (command === 'git' && args[0] === 'config') {
           return { status: 0, stdout: `${gitName}\n`, stderr: '' };
@@ -107,6 +107,36 @@ describe('particle post/status/log', () => {
       <key> | try the widget | 2 | 0/0 | open
       "
     `);
+  });
+
+  it('uses the repository root when invoked from a subdirectory', async () => {
+    const root = tempRepo();
+    const subdir = join(root, 'packages', 'example');
+    mkdirSync(subdir, { recursive: true });
+
+    const posted = harness(root);
+    expect(await run(['post', 'from the root'], posted.context)).toBe(0);
+    const key = posted.out.join('').match(/^created (.+)\n$/)![1]!;
+
+    const fromSubdir = harness(subdir, 'alice', root);
+    expect(await run(['post', '--project', key, 'from below'], fromSubdir.context)).toBe(0);
+    expect(await run(['status', key], fromSubdir.context)).toBe(0);
+    expect(fromSubdir.out.join('')).toContain('from the root');
+    expect(fromSubdir.out.join('')).toContain('2     0/0');
+    expect(openStore(join(root, '.particle')).load()).toHaveLength(3);
+    expect(existsSync(join(subdir, '.particle', 'journal.ndjson'))).toBe(false);
+
+    writeFileSync(
+      join(root, 'particle.yaml'),
+      'host:\n  repo: acme/widgets\nchannels:\n  github-issues: {}\n',
+    );
+    writeFileSync(
+      join(root, '.particle', 'github-app.json'),
+      JSON.stringify({ id: 7, slug: 'particle-agent', client_id: 'Iv1.test' }),
+    );
+    writeFileSync(join(root, '.particle', 'github-app.private-key.pem'), 'test key');
+    expect(await run(['init'], fromSubdir.context)).toBe(0);
+    expect(fromSubdir.out.join('')).toContain(`ok  git repository (${root})`);
   });
 
   it('renders canonical, deduplicated human and NDJSON logs', async () => {

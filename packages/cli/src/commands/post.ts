@@ -49,7 +49,7 @@ export async function post(args: string[], context: CommandContext): Promise<num
     return 2;
   }
 
-  const store = storeFor(context.cwd);
+  const store = storeFor(context);
   const projects = loadProjects(store);
   const requestedKey = parsed.values.project;
   const existing = requestedKey

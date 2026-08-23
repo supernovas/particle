@@ -14,6 +14,12 @@ export interface CommandContext {
   run: (command: string, args: string[]) => CommandResult;
 }
 
+export function workspaceRoot(context: CommandContext): string {
+  const result = context.run('git', ['rev-parse', '--show-toplevel']);
+  const root = result.stdout.trim();
+  return result.status === 0 && root !== '' ? root : context.cwd;
+}
+
 export function defaultContext(): CommandContext {
   const cwd = process.cwd();
   return {

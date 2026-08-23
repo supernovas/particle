@@ -7,6 +7,7 @@ import {
   type ProjectState,
 } from '@particle/core';
 import { openStore, type EventStore } from '@particle/worker/store';
+import { workspaceRoot, type CommandContext } from './context.ts';
 
 export interface StoredProject {
   key: string;
@@ -15,8 +16,8 @@ export interface StoredProject {
   events: ParticleEvent[];
 }
 
-export function storeFor(cwd: string): EventStore {
-  return openStore(join(cwd, '.particle'));
+export function storeFor(context: CommandContext): EventStore {
+  return openStore(join(workspaceRoot(context), '.particle'));
 }
 
 export function canonicalEvents(events: Iterable<ParticleEvent>): ParticleEvent[] {
