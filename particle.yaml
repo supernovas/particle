@@ -16,5 +16,6 @@ channels:
 runner:
   # Bring your own headless agent CLI; the reference setup is codex reusing the
   # operator's OAuth login. Command template placeholders: {prompt}, {workdir}.
-  #   command: ["codex", "exec", "{prompt}"]
+  # See docs/runners/codex.md for a working non-interactive command.
   command: null
+  timeout-seconds: 900
