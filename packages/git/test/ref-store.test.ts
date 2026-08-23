@@ -116,6 +116,29 @@ describe('RefStore', () => {
     ).rejects.toThrow(/different content/);
   });
 
+  it('stores valid GitHub bot actors under Git-safe encoded refs', async () => {
+    const gitDir = await bare('bot-actor');
+    const store = new RefStore({ gitDir });
+    const bot = event(
+      'evt_01J8ZC3AH2V9FYQ6MZ0X7T4KDY',
+      'message.posted',
+      'github:dependabot[bot]',
+      1,
+      { body: 'automated update' },
+    );
+
+    await store.append(PROJECT, bot.actor, [bot]);
+    const { stdout: refs } = await exec('git', [
+      '--git-dir',
+      gitDir,
+      'for-each-ref',
+      '--format=%(refname)',
+      `refs/particle/${PROJECT}/actors/`,
+    ]);
+    expect(refs.trim()).toBe(`refs/particle/${PROJECT}/actors/github-dependabot%5Bbot%5D`);
+    await expect(store.readEvents(PROJECT)).resolves.toEqual([bot]);
+  });
+
   it('CAS-rejects concurrent writers to one actor ref without losing either winner batch', async () => {
     const gitDir = await bare('cas');
     const stores = Array.from({ length: 8 }, () => new RefStore({ gitDir }));

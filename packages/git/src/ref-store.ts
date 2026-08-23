@@ -431,7 +431,11 @@ interface TreeEntry {
 }
 
 function actorRef(project: string, actor: ActorId): string {
-  return `${PARTICLE_PREFIX}${project}/actors/${actor.replace(/[:/]/g, '-')}`;
+  // Core accepts GitHub App logins such as dependabot[bot], while `[` is not
+  // legal in a Git ref. Keep the SPEC slug for ordinary actors and percent-
+  // encode the bracket suffix so every validated ActorId remains storable.
+  const slug = actor.replace(/[:/]/g, '-').replace(/\[/g, '%5B').replace(/\]/g, '%5D');
+  return `${PARTICLE_PREFIX}${project}/actors/${slug}`;
 }
 
 function assertProject(project: string): void {
