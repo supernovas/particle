@@ -9,6 +9,7 @@
   },
   "dependencies": {
     "@particle/core": "*",
+    "@particle/git": "*",
     "yaml": "^2.5.0"
   }
 }

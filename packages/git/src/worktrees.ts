@@ -29,14 +29,38 @@ export async function createTaskWorktree(
   }
 
   try {
-    await writeOwnership(repoDir, path, branch);
+    return await writeOwnership(repoDir, path, branch);
   } catch (error) {
     await runIn(repoDir, ['worktree', 'remove', '--force', path]).catch(() => undefined);
     await runIn(repoDir, ['branch', '-D', branch]).catch(() => undefined);
     await rm(path, { recursive: true, force: true });
     throw error;
   }
-  return path;
+}
+
+/** Return Particle's owned task worktree, creating it on the first attempt. */
+export async function getOrCreateTaskWorktree(
+  repoDir: string,
+  project: string,
+  task: string,
+): Promise<string> {
+  assertSegment(project, 'project');
+  assertSegment(task, 'task');
+  const branch = `particle/${project}/${task}`;
+  const registered = (await registeredWorktrees(repoDir)).find((entry) => entry.branch === branch);
+  if (!registered) {
+    if (await refExists(repoDir, `refs/heads/${branch}`)) {
+      throw new Error(`task branch exists without an owned worktree: ${branch}`);
+    }
+    return createTaskWorktree(repoDir, project, task);
+  }
+
+  const ownership = await readOwnership(repoDir, registered.path);
+  if (ownership.branch !== branch) {
+    throw new Error(`task worktree branch does not match ownership marker: ${ownership.branch}`);
+  }
+  await verifyWorktreeIdentity(registered.path, ownership.nonce);
+  return registered.path;
 }
 
 /** Remove an isolated task worktree and its task branch. */
@@ -176,21 +200,22 @@ interface OwnershipBase {
 type Ownership = OwnershipBase &
   ({ phase: 'active'; expectedTip?: never } | { phase: 'removing'; expectedTip: string });
 
-async function writeOwnership(repoDir: string, path: string, branch: string): Promise<void> {
-  const marker = await markerPath(repoDir, path);
-  await mkdir(resolve(marker, '..'), { recursive: true });
+async function writeOwnership(repoDir: string, path: string, branch: string): Promise<string> {
   const registered = await registeredWorktreeForBranch(repoDir, branch);
+  const marker = await markerPath(repoDir, registered.path);
+  await mkdir(resolve(marker, '..'), { recursive: true });
   const nonce = randomBytes(32).toString('hex');
   const identity = await worktreeIdentityPath(registered.path);
   await writeFile(identity, `${nonce}\n`, { flag: 'wx' });
   const ownership = {
-    path: resolve(path),
+    path: resolve(registered.path),
     registeredPath: registered.path,
     branch,
     nonce,
     phase: 'active',
   };
   await writeFile(marker, `${JSON.stringify(ownership)}\n`, { flag: 'wx' });
+  return registered.path;
 }
 
 async function replaceOwnershipMarker(ownership: Ownership): Promise<void> {

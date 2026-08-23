@@ -80,7 +80,7 @@ class ScriptedRunner implements AgentRunner {
         }),
       ];
     }
-    return { events, exitCode: 0, transcriptPath: `/tmp/${ctx.runId}.log` };
+    return { events, exitCode: 0, transcriptPath: `/tmp/${ctx.role}.log` };
   }
 }
 

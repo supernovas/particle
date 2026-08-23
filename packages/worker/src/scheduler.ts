@@ -9,31 +9,11 @@ import {
   type ReviewRequested,
   type TaskClaimed,
 } from '@particle/core';
-import type { AgentRole, AgentRunRequest, SchedulerRule } from './rules.ts';
+import type { AgentRunRequest, SchedulerRule } from './rules.ts';
+import type { AgentRunContext, AgentRunner } from './runner/index.ts';
 
 export type { AgentRunRequest, SchedulerRule } from './rules.ts';
-
-export interface AgentRunContext {
-  role: AgentRole;
-  project: string;
-  taskId?: string;
-  state: ProjectState;
-  workdir: string;
-  promptPath: string;
-  /** Optional correlation supplied by the scheduler stand-in; T6 may ignore it. */
-  runId?: string;
-}
-
-export interface AgentRunResult {
-  events: ParticleEvent[];
-  exitCode: number;
-  transcriptPath: string;
-}
-
-/** Structurally compatible with the P1.T6 AgentRunner interface. */
-export interface AgentRunner {
-  start(ctx: AgentRunContext): Promise<AgentRunResult>;
-}
+export type { AgentRunContext, AgentRunner } from './runner/index.ts';
 
 export interface Budgets {
   maxPlannerRuns: number;
@@ -48,9 +28,9 @@ export const DEFAULT_BUDGETS: Readonly<Budgets> = {
 };
 
 export interface SchedulerOptions {
-  /** Durable append hook. Production wires this to Journal now and RefStore after P1.T3. */
+  /** Durable append hook. Production wires this to the configured shared event store. */
   append?: (events: ParticleEvent[]) => void | Promise<void>;
-  workdir?: string;
+  workdir?: string | ((request: AgentRunRequest) => string | Promise<string>);
   promptPath?: (request: AgentRunRequest) => string;
   now?: () => Date;
 }
@@ -61,7 +41,7 @@ export class Scheduler {
   private readonly inFlight = new Set<string>();
   private readonly outbox: ParticleEvent[] = [];
   private readonly append: (events: ParticleEvent[]) => void | Promise<void>;
-  private readonly workdir: string;
+  private readonly workdir: (request: AgentRunRequest) => string | Promise<string>;
   private readonly promptPath: (request: AgentRunRequest) => string;
   private readonly now: () => Date;
 
@@ -76,8 +56,14 @@ export class Scheduler {
       ((events) => {
         this.outbox.push(...events);
       });
-    this.workdir = options.workdir ?? process.cwd();
-    this.promptPath = options.promptPath ?? (() => '');
+    const configuredWorkdir = options.workdir;
+    this.workdir =
+      typeof configuredWorkdir === 'function'
+        ? configuredWorkdir
+        : () => configuredWorkdir ?? process.cwd();
+    this.promptPath =
+      options.promptPath ??
+      ((request) => `.particle/prompts/${request.role}-${request.taskId ?? 'project'}.md`);
     this.now = options.now ?? (() => new Date());
   }
 
@@ -168,14 +154,14 @@ export class Scheduler {
     const runId = newId('run');
     const actor = `agent:${request.role}/${runId}` as ActorId;
     try {
+      const workdir = await this.workdir(request);
       const marker = this.runMarker(state, request, actor);
       await this.appendEvents(state, [marker]);
       const result = await this.runner.start({
         ...request,
         state,
-        workdir: this.workdir,
+        workdir,
         promptPath: this.promptPath(request),
-        runId,
       });
       const normalized = this.normalizeResultEvents(state, marker, actor, result.events);
       if (normalized.length > 0) await this.appendEvents(state, normalized);
