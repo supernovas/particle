@@ -87,7 +87,7 @@ function LiveApp({
   );
 }
 
-export function MockApp({ offline }: { offline: boolean }) {
+export function MockApp({ offline, embedded }: { offline: boolean; embedded?: boolean }) {
   const [channelId, setChannelId] = useState('eng');
   const [projectId, setProjectId] = useState<string | null>('speed-up-ci');
   const [messages, setMessages] = useState<Message[]>(MESSAGES);
@@ -216,6 +216,7 @@ export function MockApp({ offline }: { offline: boolean }) {
         ]);
       }}
       onTogglePause={togglePause}
+      embedded={embedded}
     />
   );
 }

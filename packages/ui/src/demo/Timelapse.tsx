@@ -59,6 +59,7 @@ export function Timelapse({ active, run }: { active: boolean; run: number }) {
           onOpenProject={noop}
           onCloseProject={noop}
           onSendReply={noop}
+          embedded
         />
       </Frame>
       <div className="tl-caption-row">

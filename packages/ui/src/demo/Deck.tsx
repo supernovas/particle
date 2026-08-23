@@ -75,7 +75,7 @@ const SLIDES: Slide[] = [
         <div className="sl-kicker sl-kicker-top">live — click around</div>
         <div className="tl">
           <Frame title="particle — workspace" interactive>
-            <MockApp offline={false} />
+            <MockApp offline={false} embedded />
           </Frame>
           <div className="tl-caption-row">
             <span className="tl-caption">the same app you just watched build itself</span>
@@ -146,11 +146,6 @@ export function Deck() {
   const [replay, setReplay] = useState(0);
 
   useEffect(() => {
-    window.localStorage.setItem('particle-theme', 'dark');
-    document.documentElement.dataset.theme = 'dark';
-  }, []);
-
-  useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
       const target = e.target as HTMLElement | null;
       if (target && (target.tagName === 'TEXTAREA' || target.tagName === 'INPUT')) return;
@@ -171,7 +166,7 @@ export function Deck() {
   }, []);
 
   return (
-    <div className="deck">
+    <div className="deck" data-theme="dark">
       {SLIDES.map((slide, i) => (
         <section key={slide.id} className={`deck-slide${i === index ? ' active' : ''}`}>
           {slide.bg ? <Shader name={slide.bg} active={i === index} /> : null}

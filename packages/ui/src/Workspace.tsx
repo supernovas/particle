@@ -44,15 +44,18 @@ export interface WorkspaceProps {
   startNote?: { href: string; label: string };
   onSendReply: (text: string) => void;
   onTogglePause?: () => void;
+  /** Inside the deck: pin dark, never touch document-level theme state. */
+  embedded?: boolean;
 }
 
 export function Workspace(props: WorkspaceProps) {
-  const [theme, setTheme] = useState<Theme>(initialTheme);
+  const [theme, setTheme] = useState<Theme>(props.embedded ? 'dark' : initialTheme);
 
   useEffect(() => {
+    if (props.embedded) return;
     document.documentElement.dataset.theme = theme;
     window.localStorage.setItem('particle-theme', theme);
-  }, [theme]);
+  }, [theme, props.embedded]);
 
   const projectsById = useMemo(
     () => Object.fromEntries(props.projects.map((p) => [p.id, p])),
