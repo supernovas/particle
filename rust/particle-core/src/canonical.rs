@@ -36,7 +36,7 @@ fn encode(value: &Value, out: &mut String) {
         Value::Object(values) => {
             out.push('{');
             let mut entries = values.iter().collect::<Vec<_>>();
-            entries.sort_by(|(left, _), (right, _)| left.cmp(right));
+            entries.sort_by_key(|(key, _)| *key);
             for (index, (key, value)) in entries.into_iter().enumerate() {
                 if index > 0 {
                     out.push(',');
