@@ -29,7 +29,9 @@ export RUSTUP_HOME=/opt/rustup CARGO_HOME=/opt/cargo
   | sh -s -- -y --profile minimal --default-toolchain stable
 if ! node --version 2>/dev/null | grep -Eq '^v22\.'; then
   curl -fsSL https://deb.nodesource.com/setup_22.x | bash -
-  apt-get install -qy nodejs
+  # The live image previously installed Node 24; explicitly permit the pinned
+  # major downgrade instead of leaving the newer package in place.
+  apt-get install -qy --allow-downgrades nodejs
 fi
 node --version | grep -Eq '^v22\.'
 

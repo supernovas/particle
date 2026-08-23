@@ -20,6 +20,7 @@ function unit(name: string): string {
 describe('production worker bootstrap', () => {
   it('pins Node 22 and an exact Codex CLI release', () => {
     expect(startup).toContain('setup_22.x');
+    expect(startup).toContain('apt-get install -qy --allow-downgrades nodejs');
     expect(startup).toContain('CODEX_VERSION=0.149.0');
     expect(startup).toContain('"@openai/codex@$CODEX_VERSION"');
   });
