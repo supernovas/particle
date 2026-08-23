@@ -30,6 +30,10 @@ Requires Node ≥ 22 and a GitHub App for your workspace (ours is `particle-agen
 ```sh
 npm install
 
+# Local channel: inspect projects or post a prompt without a GitHub round-trip
+npm exec particle status
+npm exec particle post "try the widget"
+
 # One-time: register + install a GitHub App for your org (writes ./.particle/, gitignored)
 node scripts/create-github-app.mjs <your-org>
 
@@ -49,7 +53,8 @@ npm run typecheck  # tsc
 ```
 
 Packages: [`@particle/core`](./packages/core) (event model, clocks, deterministic fold),
-[`@particle/worker`](./packages/worker) (daemon). Task breakdown and status live in the
-tracking issues filed from [#1](https://github.com/supernovas/particle/issues/1).
+[`@particle/worker`](./packages/worker) (daemon), and [`particle`](./packages/cli) (local CLI).
+Task breakdown and status live in the tracking issues filed from
+[#1](https://github.com/supernovas/particle/issues/1).
 
 MIT licensed.

@@ -2,11 +2,16 @@ import { appendFileSync, existsSync, mkdirSync, readFileSync } from 'node:fs';
 import { dirname } from 'node:path';
 import type { ParticleEvent } from '@particle/core';
 
+export interface EventStore {
+  load(): ParticleEvent[];
+  append(events: ParticleEvent[]): void;
+}
+
 /**
  * Phase-0 stand-in for the git ref store (P1.T3): an append-only NDJSON event
  * journal on disk. Same events, same fold — only the transport is temporary.
  */
-export class Journal {
+export class Journal implements EventStore {
   constructor(private readonly path: string) {
     mkdirSync(dirname(path), { recursive: true });
   }

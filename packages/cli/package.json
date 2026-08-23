@@ -1,0 +1,13 @@
+{
+  "name": "particle",
+  "version": "0.0.1",
+  "private": true,
+  "type": "module",
+  "bin": {
+    "particle": "bin/particle.mjs"
+  },
+  "dependencies": {
+    "@particle/core": "*",
+    "@particle/worker": "*"
+  }
+}

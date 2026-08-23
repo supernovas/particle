@@ -1,9 +1,12 @@
 {
-  "name": "particle",
+  "name": "@particle/workspace",
   "private": true,
   "version": "0.0.1",
   "description": "Multiplayer agent harness on a git backend",
   "type": "module",
+  "bin": {
+    "particle": "packages/cli/bin/particle.mjs"
+  },
   "workspaces": [
     "packages/*"
   ],

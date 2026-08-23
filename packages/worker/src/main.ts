@@ -12,7 +12,7 @@ import {
 import { loadConfig } from './config.ts';
 import { InstallationTokenProvider, loadAppCreds } from './github/auth.ts';
 import { emptyCursor, IssueChannel, type Cursor, type Prompt } from './github/issues.ts';
-import { Journal } from './journal.ts';
+import { openStore } from './store.ts';
 
 const STATE_DIR = '.particle';
 const CURSOR_PATH = `${STATE_DIR}/cursor.json`;
@@ -79,7 +79,7 @@ async function main() {
   const [owner] = config.host.repo.split('/');
   const tokens = new InstallationTokenProvider(creds, owner!);
   const channel = new IssueChannel(tokens, config.channels.githubIssues, creds.slug);
-  const journal = new Journal(`${STATE_DIR}/journal.ndjson`);
+  const journal = openStore(STATE_DIR);
 
   console.log(`particle-worker v0 — host ${config.host.repo}, app ${creds.slug} (#${creds.id})`);
 
