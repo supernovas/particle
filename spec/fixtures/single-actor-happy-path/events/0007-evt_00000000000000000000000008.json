@@ -1,0 +1,1 @@
+{"actor":"agent:worker/run_0000000000000000000000003G","clock":{"lamport":8,"wall":"2026-08-23T20:00:08.000Z"},"data":{"status":"converged"},"id":"evt_00000000000000000000000008","parents":[],"project":"prj_00000000000000000000000001","type":"project.status","v":0}

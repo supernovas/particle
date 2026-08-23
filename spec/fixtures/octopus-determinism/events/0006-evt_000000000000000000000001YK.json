@@ -1,0 +1,1 @@
+{"actor":"agent:alpha/run_0000000000000000000000003A","clock":{"lamport":3,"wall":"2026-08-23T20:33:23.000Z"},"data":{"deps":[],"spec":"Build the right side.","taskId":"tsk_0000000000000000000000006C","title":"Right"},"id":"evt_000000000000000000000001YK","parents":[],"project":"prj_00000000000000000000000001","type":"task.created","v":0}

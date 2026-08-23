@@ -1,0 +1,1 @@
+{"actor":"github:alice","clock":{"lamport":2,"wall":"2026-08-23T20:00:42.000Z"},"data":{"body":"deliver once"},"id":"evt_0000000000000000000000001A","parents":[],"project":"prj_00000000000000000000000001","type":"message.posted","v":0}

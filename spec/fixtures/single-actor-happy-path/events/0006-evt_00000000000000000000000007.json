@@ -1,0 +1,1 @@
+{"actor":"agent:reviewer/run_0000000000000000000000003E","clock":{"lamport":7,"wall":"2026-08-23T20:00:07.000Z"},"data":{"comments":[],"verdict":"approve"},"id":"evt_00000000000000000000000007","parents":[],"project":"prj_00000000000000000000000001","type":"review.posted","v":0}

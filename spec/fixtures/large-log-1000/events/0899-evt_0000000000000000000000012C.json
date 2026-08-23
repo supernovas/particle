@@ -1,0 +1,1 @@
+{"actor":"agent:load/run_00000000000000000000000039","clock":{"lamport":101,"wall":"2026-08-23T20:18:20.000Z"},"data":{"body":"message 0100"},"id":"evt_0000000000000000000000012C","parents":[],"project":"prj_00000000000000000000000001","type":"message.posted","v":0}

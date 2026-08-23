@@ -1,0 +1,1 @@
+{"actor":"agent:planner/run_0000000000000000000000003D","clock":{"lamport":3,"wall":"2026-08-23T20:00:03.000Z"},"data":{"deps":[],"spec":"Implement and test it.","taskId":"tsk_0000000000000000000000006D","title":"Build widget"},"id":"evt_00000000000000000000000003","parents":[],"project":"prj_00000000000000000000000001","type":"task.created","v":0}

@@ -1,0 +1,3 @@
+# Normative canonical-JSON and byte-exact expectation artifacts.
+spec/fixtures/**/*.json
+spec/fixtures/**/*.txt
