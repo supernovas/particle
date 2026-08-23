@@ -23,7 +23,13 @@ async function pages(path) {
 }
 
 const snippet = (text, n = 110) => {
-  const flat = (text ?? '').replace(/\s+/g, ' ').trim();
+  const flat = (text ?? '')
+    .replace(/<[^>]+>/g, ' ') // raw HTML tags (Greptile summaries)
+    .replace(/!\[[^\]]*\]\([^)]*\)/g, ' ') // images
+    .replace(/\[([^\]]*)\]\([^)]*\)/g, '$1') // links → text
+    .replace(/[*_`#>|-]{1,}/g, (m) => (m.length > 1 ? ' ' : m)) // md furniture
+    .replace(/\s+/g, ' ')
+    .trim();
   return flat.length > n ? `${flat.slice(0, n - 1)}…` : flat;
 };
 

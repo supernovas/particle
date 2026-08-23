@@ -1,4 +1,4 @@
-import type { Actor, Message, Project } from '../types';
+import type { Actor, Message, Project, Turn } from '../types';
 import type { OpenIssue } from '../live';
 import { AVATARS, HISTORY, type RepoEvent } from './history';
 
@@ -84,6 +84,7 @@ export interface TimelapseState {
   messages: Message[];
   projects: Project[];
   issues: OpenIssue[];
+  turns: Turn[];
   caption: string;
   done: boolean;
 }
@@ -109,6 +110,18 @@ export function timelapseState(count: number): TimelapseState {
     .map((e) => ({ number: e.number, title: e.title, url: `${REPO_URL}/issues/${e.number}` }));
   const merges = shown.filter((e) => e.kind === 'merge').length;
   const done = count >= TOTAL;
+
+  // The right pane follows the founding thread: everything on issue #1.
+  const turns: Turn[] = shown
+    .filter((e) => e.number === 1)
+    .map((e, i) => ({
+      id: `t${i}`,
+      projectId: 'bootstrap',
+      actorId: e.author,
+      kind: 'comment' as const,
+      time: when(e.at),
+      title: e.body || e.title,
+    }));
 
   const projects: Project[] =
     shown.length === 0
@@ -136,5 +149,5 @@ export function timelapseState(count: number): TimelapseState {
       ? `${shown.length}/${TOTAL} · ${captionLine(last)}`
       : 'day zero';
 
-  return { messages, projects, issues, caption, done };
+  return { messages, projects, issues, turns, caption, done };
 }

@@ -50,14 +50,14 @@ export function Timelapse({
           ]}
           messages={state.messages}
           projects={state.projects}
-          turns={[]}
+          turns={state.turns}
           currentUserId="wildkakapo"
           workspaceLabel="supernovas/particle"
           mode="live"
           repoUrl="https://github.com/supernovas/particle"
           unreads={{}}
           channelId="github-issues"
-          projectId={null}
+          projectId={state.projects.length > 0 ? 'bootstrap' : null}
           issues={state.issues}
           newIssueUrl="https://github.com/supernovas/particle/issues/new"
           onSelectChannel={noop}
