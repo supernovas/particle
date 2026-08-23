@@ -17,6 +17,8 @@ import { InstallationTokenProvider, loadAppCreds } from './github/auth.ts';
 import { serializeWorkspace } from './serialize.ts';
 import { startServer, type UiServer } from './server.ts';
 import { openStore } from './store.ts';
+import { defaultRules } from './rules.ts';
+import { DEFAULT_BUDGETS, Scheduler, type AgentRunContext, type AgentRunner } from './scheduler.ts';
 
 const STATE_DIR = process.env.PARTICLE_STATE_DIR ?? '.particle';
 const CURSOR_PATH = `${STATE_DIR}/cursor.json`;
@@ -48,6 +50,13 @@ function setupGitPushAuth(tokens: InstallationTokenProvider): () => Promise<void
   };
 }
 
+/** Phase-0 stand-in until P1.T6 supplies the configured subprocess runner. */
+class NoopRunner implements AgentRunner {
+  async start(ctx: AgentRunContext) {
+    console.log(`[${ctx.project}] ${ctx.role}${ctx.taskId ? `(${ctx.taskId})` : ''} queued`);
+    return { events: [], exitCode: 0, transcriptPath: '' };
+  }
+}
 function lastClock(log: ProjectLog): Clock | undefined {
   return log.events.at(-1)?.clock;
 }
@@ -173,6 +182,15 @@ async function main() {
     console.log(`ui: http://localhost:${port} (api + events; dist served when built)`);
   }
 
+  const scheduler = new Scheduler(defaultRules, new NoopRunner(), DEFAULT_BUDGETS, {
+    append(events) {
+      journal.append(events);
+      for (const event of events) {
+        const log = [...projects.values()].find((candidate) => candidate.id === event.project);
+        if (log && !log.events.some((existing) => existing.id === event.id)) log.events.push(event);
+      }
+    },
+  });
   let stopping = false;
   let wake: (() => void) | undefined;
   const stop = () => {
@@ -187,7 +205,8 @@ async function main() {
   do {
     try {
       const messages = await channel.poll();
-      const touched = new Set<string>();
+      // Re-evaluate replayed projects too: durable log evidence makes every tick idempotent.
+      const touched = new Set(projects.keys());
       const fresh: ParticleEvent[] = [];
       for (const message of messages) {
         let log = projects.get(message.projectKey);
@@ -212,6 +231,12 @@ async function main() {
       }
       for (const key of touched) {
         const log = projects.get(key)!;
+        // Runner output is itself an event edge. Keep folding until no rule emits anything.
+        for (;;) {
+          const before = log.events.length;
+          await scheduler.tick(fold(log.id, log.events));
+          if (log.events.length === before) break;
+        }
         const state = fold(log.id, log.events);
         const tasks = Object.values(state.tasks);
         console.log(

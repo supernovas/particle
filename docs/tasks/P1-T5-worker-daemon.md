@@ -79,3 +79,12 @@ a worker crash/restart never double-spawns an agent.
 
 Real agent CLI execution (T6), multi-worker leasing (Phase 3 — single worker owns a
 workspace in Phase 1), webhooks.
+
+## Bootstrap integration note
+
+This task remains independently runnable against the bootstrap branch by wiring the scheduler
+to the append-only `Journal` and an in-process no-op runner in `main.ts`. When the parallel
+dependencies land, replace the scheduler append hook with T3's `RefStore.append`, pass T6's
+configured `AgentRunner` (the scheduler contract is structurally compatible), and keep T4's
+`ChannelAdapter` poll/deliver calls around the same fold-to-fixed-point loop. The scheduling
+rules and durable marker events do not depend on those transport implementations.
