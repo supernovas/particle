@@ -334,3 +334,51 @@
     animation: none;
   }
 }
+
+/* ---- git mechanism + v2 slides */
+
+.sl-title-sm {
+  font-size: clamp(40px, 5.5vw, 84px);
+}
+
+.sl-accent {
+  color: var(--accent);
+}
+
+.gitrefs {
+  width: min(940px, 86vw);
+  height: auto;
+}
+
+.gr-label {
+  font-family: var(--font-mono);
+  font-size: 15px;
+  fill: var(--text-2);
+}
+
+.gr-fold {
+  font-size: 24px;
+  font-weight: 650;
+  fill: var(--text);
+}
+
+.gr-note {
+  font-size: 14px;
+  fill: var(--text-3);
+}
+
+.sl-bullets {
+  display: flex;
+  gap: clamp(16px, 3vw, 40px);
+  flex-wrap: wrap;
+  justify-content: center;
+  font-size: 15px;
+  color: var(--text-2);
+}
+
+.sl-bullets span {
+  padding: 7px 16px;
+  border: 1px solid var(--border);
+  border-radius: 99px;
+  background: color-mix(in srgb, var(--panel) 70%, transparent);
+}
