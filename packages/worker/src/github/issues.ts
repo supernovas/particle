@@ -1,6 +1,13 @@
 import type { GithubIssuesChannelConfig } from '../config.ts';
 import { ghJson, type InstallationTokenProvider } from './auth.ts';
 
+/** An open issue in the channel repo — surfaced in the UI as a candidate project. */
+export interface OpenIssue {
+  number: number;
+  title: string;
+  url: string;
+}
+
 /** A human utterance pulled from the channel, not yet a particle event. */
 export interface Prompt {
   /** Stable channel-local project key, e.g. "gh-1". */
@@ -100,6 +107,19 @@ export class IssueChannel {
     }
 
     return { prompts, cursor: next };
+  }
+
+  /** All open issues (first page) — the UI's sidebar listing. */
+  async listOpen(): Promise<OpenIssue[]> {
+    const token = await this.tokens.get();
+    const issues = await ghJson(`/repos/${this.cfg.repo}/issues?state=open&per_page=100`, token);
+    return issues
+      .filter((issue: { pull_request?: unknown }) => !issue.pull_request)
+      .map((issue: { number: number; title: string; html_url: string }) => ({
+        number: issue.number,
+        title: issue.title,
+        url: issue.html_url,
+      }));
   }
 
   async post(issueNumber: number, body: string): Promise<string> {

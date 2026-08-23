@@ -79,6 +79,12 @@ export interface UiChannel {
   topic: string;
 }
 
+export interface UiIssue {
+  number: number;
+  title: string;
+  url: string;
+}
+
 export interface WorkspacePayload {
   workspace: { repo: string; operator: string; newProjectUrl: string };
   currentUserId: string;
@@ -87,6 +93,8 @@ export interface WorkspacePayload {
   messages: UiMessage[];
   projects: UiProject[];
   turns: UiTurn[];
+  /** Open issues that are not yet projects — candidates, shown in the sidebar. */
+  issues: UiIssue[];
 }
 
 const CHANNEL_ID = 'github-issues';
@@ -212,6 +220,7 @@ export function serializeWorkspace(
   logs: ProjectLogView[],
   config: Config,
   operator: string,
+  openIssues: UiIssue[] = [],
 ): WorkspacePayload {
   const actors = new Map<string, UiActor>();
   const messages: UiMessage[] = [];
@@ -287,5 +296,6 @@ export function serializeWorkspace(
     messages,
     projects,
     turns,
+    issues: openIssues.filter((issue) => !projects.some((p) => p.issue === issue.number)),
   };
 }

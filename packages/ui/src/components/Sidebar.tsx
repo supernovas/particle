@@ -1,4 +1,5 @@
 import type { Channel, Project } from '../types';
+import type { OpenIssue } from '../live';
 import { useActors } from '../actors';
 import { Avatar } from './Avatar';
 import { IconMoon, IconSun, Logo } from './icons';
@@ -10,6 +11,8 @@ interface SidebarProps {
   unreads: Record<string, number>;
   channelId: string;
   projectId: string | null;
+  issues?: OpenIssue[];
+  newIssueUrl?: string;
   theme: 'light' | 'dark';
   currentUserId: string;
   workspaceLabel: string;
@@ -76,6 +79,34 @@ export function Sidebar(props: SidebarProps) {
             </button>
           );
         })}
+
+        {props.newIssueUrl ? (
+          <>
+            <div className="side-label">Open issues</div>
+            <a
+              className="side-item issue-new"
+              href={props.newIssueUrl}
+              target="_blank"
+              rel="noreferrer"
+            >
+              <span className="issue-plus">+</span>
+              <span className="side-item-title">Open an issue</span>
+            </a>
+            {(props.issues ?? []).map((issue) => (
+              <a
+                key={issue.number}
+                className="side-item issue-item"
+                href={issue.url}
+                target="_blank"
+                rel="noreferrer"
+                title={`#${issue.number} — ${issue.title}`}
+              >
+                <span className="issue-num">#{issue.number}</span>
+                <span className="side-item-title">{issue.title}</span>
+              </a>
+            ))}
+          </>
+        ) : null}
       </nav>
 
       <div className="side-foot">

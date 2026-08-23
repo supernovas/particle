@@ -2,6 +2,12 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import type { Actor, ActorId, Channel, Message, Project, Turn } from './types';
 
 /** Shape served by the worker (packages/worker/src/serialize.ts). */
+export interface OpenIssue {
+  number: number;
+  title: string;
+  url: string;
+}
+
 export interface WorkspacePayload {
   workspace: { repo: string; operator: string; newProjectUrl: string };
   currentUserId: ActorId;
@@ -10,6 +16,7 @@ export interface WorkspacePayload {
   messages: Message[];
   projects: Project[];
   turns: Turn[];
+  issues: OpenIssue[];
 }
 
 export type LiveStatus = 'connecting' | 'live' | 'offline' | 'mock';

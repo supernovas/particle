@@ -11,7 +11,13 @@ import {
 } from '@particle/core';
 import { loadConfig } from './config.ts';
 import { InstallationTokenProvider, loadAppCreds } from './github/auth.ts';
-import { emptyCursor, IssueChannel, type Cursor, type Prompt } from './github/issues.ts';
+import {
+  emptyCursor,
+  IssueChannel,
+  type Cursor,
+  type OpenIssue,
+  type Prompt,
+} from './github/issues.ts';
 import { serializeWorkspace } from './serialize.ts';
 import { startServer, type UiServer } from './server.ts';
 import { openStore } from './store.ts';
@@ -87,6 +93,7 @@ async function main() {
   console.log(`particle-worker v0 — host ${config.host.repo}, app ${creds.slug} (#${creds.id})`);
 
   const projects = new Map<string, ProjectLog>();
+  let openIssues: OpenIssue[] = [];
   for (const event of journal.load()) {
     if (event.type === 'project.created') {
       const source = (event.data as ProjectCreated).source;
@@ -111,7 +118,7 @@ async function main() {
     const port = Number(process.env.PARTICLE_UI_PORT ?? 7455);
     server = startServer(
       {
-        payload: () => serializeWorkspace([...projects.values()], config, operator),
+        payload: () => serializeWorkspace([...projects.values()], config, operator, openIssues),
         async postMessage(projectId, body) {
           const log = [...projects.values()].find((l) => l.id === projectId);
           if (!log) return false;
@@ -154,6 +161,7 @@ async function main() {
     try {
       const result = await channel.poll(cursor);
       cursor = result.cursor;
+      openIssues = await channel.listOpen();
       const touched = new Set<string>();
       const fresh: ParticleEvent[] = [];
       for (const prompt of result.prompts) {

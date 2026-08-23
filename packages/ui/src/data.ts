@@ -22,6 +22,13 @@ const ACTOR_LIST: Actor[] = [
 
 export const ACTORS: Record<ActorId, Actor> = Object.fromEntries(ACTOR_LIST.map((a) => [a.id, a]));
 
+/** Open issues that are not projects yet — candidates in the sidebar. */
+export const MOCK_ISSUES = [
+  { number: 12, title: 'Changelog page: dark mode parity', url: `${REPO_URL}/issues` },
+  { number: 14, title: 'Notify watchers when a review lands', url: `${REPO_URL}/issues` },
+  { number: 15, title: 'CLI: `particle log` should stream', url: `${REPO_URL}/issues` },
+];
+
 export const CHANNELS: Channel[] = [
   { id: 'particle', name: 'particle', topic: 'Building particle, with particle' },
   { id: 'eng', name: 'eng', topic: 'CI, infra, releases' },

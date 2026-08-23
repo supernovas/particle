@@ -65,7 +65,10 @@ const events: ParticleEvent[] = [
 ];
 
 describe('serializeWorkspace', () => {
-  const payload = serializeWorkspace([{ id: 'prj_1', events }], config, 'kate');
+  const payload = serializeWorkspace([{ id: 'prj_1', events }], config, 'kate', [
+    { number: 7, title: 'Fix the flaky suite', url: 'https://github.com/acme/site/issues/7' },
+    { number: 9, title: 'Dark mode parity', url: 'https://github.com/acme/site/issues/9' },
+  ]);
 
   it('maps the project with protocol status, derived changes state', () => {
     expect(payload.projects).toHaveLength(1);
@@ -123,6 +126,12 @@ describe('serializeWorkspace', () => {
     expect(plan.body).toBe('1. Quarantine\n2. Fix races');
     const review = payload.turns.find((t) => t.kind === 'review')!;
     expect(review.title).toBe('Review — changes requested (1)');
+  });
+
+  it('lists open issues that are not projects yet', () => {
+    expect(payload.issues).toEqual([
+      { number: 9, title: 'Dark mode parity', url: 'https://github.com/acme/site/issues/9' },
+    ]);
   });
 
   it('links the new-project entry point', () => {

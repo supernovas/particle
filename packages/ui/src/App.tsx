@@ -1,5 +1,15 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { ACTORS, CHANNELS, CURRENT_USER, MESSAGES, PROJECTS, REPO_URL, SIM, TURNS } from './data';
+import {
+  ACTORS,
+  CHANNELS,
+  CURRENT_USER,
+  MESSAGES,
+  MOCK_ISSUES,
+  PROJECTS,
+  REPO_URL,
+  SIM,
+  TURNS,
+} from './data';
 import { useLiveWorkspace, type WorkspacePayload } from './live';
 import type { Message, Project, Turn } from './types';
 import { Workspace } from './Workspace';
@@ -49,6 +59,8 @@ function LiveApp({
       projects={data.projects}
       turns={data.turns}
       currentUserId={data.currentUserId}
+      issues={data.issues}
+      newIssueUrl={data.workspace.newProjectUrl}
       workspaceLabel={data.workspace.repo}
       mode="live"
       modeHint={`Connected to the local worker · posting as ${data.workspace.operator}`}
@@ -161,6 +173,8 @@ export function MockApp({ offline }: { offline: boolean }) {
       projects={projects}
       turns={turns}
       currentUserId={CURRENT_USER}
+      issues={MOCK_ISSUES}
+      newIssueUrl={`${REPO_URL}/issues/new`}
       workspaceLabel="Supernovas"
       mode="mock"
       modeHint={

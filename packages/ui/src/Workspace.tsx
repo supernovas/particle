@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import type { Actor, ActorId, Channel, Message, Project, Turn } from './types';
+import type { OpenIssue } from './live';
 import { ActorsProvider } from './actors';
 import { ChannelView } from './components/ChannelView';
 import { ProjectPane } from './components/ProjectPane';
@@ -22,6 +23,9 @@ export interface WorkspaceProps {
   projects: Project[];
   turns: Turn[];
   currentUserId: ActorId;
+  /** Open issues that could become projects; shown in the sidebar when set. */
+  issues?: OpenIssue[];
+  newIssueUrl?: string;
   workspaceLabel: string;
   mode: 'live' | 'mock';
   modeHint?: string;
@@ -70,6 +74,8 @@ export function Workspace(props: WorkspaceProps) {
           unreads={props.unreads}
           channelId={channel.id}
           projectId={props.projectId}
+          issues={props.issues}
+          newIssueUrl={props.newIssueUrl}
           theme={theme}
           currentUserId={props.currentUserId}
           workspaceLabel={props.workspaceLabel}
