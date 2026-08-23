@@ -75,7 +75,7 @@ function LiveApp({
   );
 }
 
-function MockApp({ offline }: { offline: boolean }) {
+export function MockApp({ offline }: { offline: boolean }) {
   const [channelId, setChannelId] = useState('eng');
   const [projectId, setProjectId] = useState<string | null>('speed-up-ci');
   const [messages, setMessages] = useState<Message[]>(MESSAGES);

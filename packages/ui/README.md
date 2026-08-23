@@ -41,3 +41,11 @@ src/
 
 No dependencies beyond React. Theme follows the system, toggleable in the sidebar
 footer, `?theme=light|dark` overrides for screenshots.
+
+## Demo deck
+
+`/demo` (or `?demo=1`) renders the hackathon deck — issue #22. Slides reuse the
+workspace components: the timelapse slide replays particle's first day inside the
+real UI shell, and the live slide embeds the interactive workspace. WebGL
+fragment-shader backgrounds live in `src/demo/shaders.ts`. Keys: arrows/space to
+navigate, `r` replays the timelapse, `f` goes fullscreen.
