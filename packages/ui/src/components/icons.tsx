@@ -93,6 +93,45 @@ export function IconBranch({ size = 13 }: IconProps) {
   );
 }
 
+export function IconIssueDot({ size = 13 }: IconProps) {
+  return (
+    <svg {...svgProps(size)}>
+      <circle cx="8" cy="8" r="5.6" />
+      <circle cx="8" cy="8" r="1.1" fill="currentColor" stroke="none" />
+    </svg>
+  );
+}
+
+export function IconPR({ size = 13 }: IconProps) {
+  return (
+    <svg {...svgProps(size)}>
+      <circle cx="4.2" cy="4" r="1.9" />
+      <circle cx="4.2" cy="12" r="1.9" />
+      <circle cx="11.8" cy="12" r="1.9" />
+      <path d="M4.2 5.9v4.2M8.4 3.5h1.9a1.5 1.5 0 0 1 1.5 1.5v5.1M8.9 1.8l-1.7 1.7 1.7 1.7" />
+    </svg>
+  );
+}
+
+export function IconMerge({ size = 13 }: IconProps) {
+  return (
+    <svg {...svgProps(size)}>
+      <circle cx="4.2" cy="3.6" r="1.9" />
+      <circle cx="4.2" cy="12.4" r="1.9" />
+      <circle cx="12" cy="8" r="1.9" />
+      <path d="M4.2 5.5v5M4.4 6.5c1 2 3 3.4 5.6 3.5" />
+    </svg>
+  );
+}
+
+export function IconComment({ size = 13 }: IconProps) {
+  return (
+    <svg {...svgProps(size)}>
+      <path d="M2.5 3.8A1.3 1.3 0 0 1 3.8 2.5h8.4a1.3 1.3 0 0 1 1.3 1.3v6a1.3 1.3 0 0 1-1.3 1.3H8l-3.2 2.6v-2.6H3.8a1.3 1.3 0 0 1-1.3-1.3v-6Z" />
+    </svg>
+  );
+}
+
 /** The particle mark: three dots, one bright. */
 export function Logo({ size = 20 }: IconProps) {
   return (

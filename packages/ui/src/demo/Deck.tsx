@@ -4,6 +4,7 @@ import { IconMoon, IconSun, Logo } from '../components/icons';
 import { Frame } from './Frame';
 import { Shader } from './Shader';
 import type { ShaderName } from './shaders';
+import { GitRefs } from './GitRefs';
 import { Timelapse } from './Timelapse';
 import './deck.css';
 
@@ -44,27 +45,29 @@ const SLIDES: Slide[] = [
           <Logo size={72} />
         </div>
         <h1 className="sl-title">particle</h1>
-        <p className="sl-sub">the MMO harness that built itself</p>
+        <p className="sl-sub">an MMO harness that bootstrapped itself</p>
       </div>
     ),
   },
   {
-    id: 'timelapse',
-    render: (active, replay, theme) => (
-      <div className="sl-full">
-        <div className="sl-kicker sl-kicker-top">one day, replayed in its own UI</div>
-        <Timelapse active={active} run={replay} theme={theme} />
-      </div>
+    id: 'problem',
+    bg: 'waves',
+    render: () => (
+      <ValueSlide
+        kicker="problem"
+        title="We built it because we needed it."
+        sub="Luke and Kate were sharing a local “prompt repo” — PLAN.mds passed back and forth between two laptops."
+      />
     ),
   },
   {
-    id: 'together',
+    id: 'solution',
     bg: 'flow',
     render: () => (
       <ValueSlide
-        kicker="value"
-        title="Your whole org prompts together"
-        sub="Founders, sales, product, engineers — every prompt, every agent turn, every review, in one shared space."
+        kicker="solution"
+        title="A massively multiplayer harness"
+        sub="Your whole org prompts together — every prompt, agent turn, and review in one shared, auditable space."
       />
     ),
   },
@@ -78,52 +81,35 @@ const SLIDES: Slide[] = [
             <MockApp offline={false} embedded theme={theme} onToggleTheme={toggleTheme} />
           </Frame>
           <div className="tl-caption-row">
-            <span className="tl-caption">the same app you just watched build itself</span>
+            <span className="tl-caption">the real workspace, running in this deck</span>
           </div>
         </div>
       </div>
     ),
   },
   {
-    id: 'suggest',
-    bg: 'julia',
+    id: 'git',
     render: () => (
-      <ValueSlide
-        kicker="value"
-        title="Agents suggest the next project"
-        sub="A project converges → agents propose follow-ups → a human hits approve, and a new thread begins."
-        tag="shipping next · issue #28"
-      />
+      <div className="sl-center">
+        <div className="sl-kicker">how it works</div>
+        <h1 className="sl-title sl-title-sm">Every project is a git ref</h1>
+        <GitRefs />
+        <div className="sl-bullets">
+          <span>append-only · one writer per ref</span>
+          <span>concurrent by construction — nobody can overwrite anybody</span>
+          <span>plain git — any host works</span>
+        </div>
+      </div>
     ),
   },
   {
-    id: 'proof',
-    bg: 'waves',
-    render: () => (
-      <div className="sl-center">
-        <h1 className="sl-title">Built in one day</h1>
-        <div className="sl-stats">
-          <div className="sl-stat">
-            <span className="sl-stat-n">2</span>
-            <span className="sl-stat-l">humans</span>
-          </div>
-          <div className="sl-stat">
-            <span className="sl-stat-n">9</span>
-            <span className="sl-stat-l">agents</span>
-          </div>
-          <div className="sl-stat">
-            <span className="sl-stat-n">30</span>
-            <span className="sl-stat-l">issues &amp; PRs</span>
-          </div>
-          <div className="sl-stat">
-            <span className="sl-stat-n">12</span>
-            <span className="sl-stat-l">PRs merged</span>
-          </div>
+    id: 'timelapse',
+    render: (active, replay, theme) => (
+      <div className="sl-full">
+        <div className="sl-kicker sl-kicker-top">
+          particle bootstrapped itself — every repo update, 15 seconds
         </div>
-        <p className="sl-sub">
-          Every pull request reviewed adversarially by Greptile — it caught real bugs before any
-          human read the diff.
-        </p>
+        <Timelapse active={active} run={replay} theme={theme} />
       </div>
     ),
   },
@@ -132,7 +118,9 @@ const SLIDES: Slide[] = [
     bg: 'orbits',
     render: () => (
       <div className="sl-center">
-        <h1 className="sl-title">We built it because we needed it.</h1>
+        <h1 className="sl-title sl-title-sm">
+          live at <span className="sl-accent">particle.supernova.ai</span>
+        </h1>
         <p className="sl-sub">
           <code>github.com/supernovas/particle</code>
         </p>

@@ -334,3 +334,123 @@
     animation: none;
   }
 }
+
+/* ---- git mechanism + v2 slides */
+
+.sl-title-sm {
+  font-size: clamp(40px, 5.5vw, 84px);
+}
+
+.sl-accent {
+  color: var(--accent);
+}
+
+.gitrefs {
+  width: min(940px, 86vw);
+  height: auto;
+}
+
+.gr-label {
+  font-family: var(--font-mono);
+  font-size: 15px;
+  fill: var(--text-2);
+}
+
+.gr-fold {
+  font-size: 24px;
+  font-weight: 650;
+  fill: var(--text);
+}
+
+.gr-note {
+  font-size: 14px;
+  fill: var(--text-3);
+}
+
+.sl-bullets {
+  display: flex;
+  gap: clamp(16px, 3vw, 40px);
+  flex-wrap: wrap;
+  justify-content: center;
+  font-size: 15px;
+  color: var(--text-2);
+}
+
+.sl-bullets span {
+  padding: 7px 16px;
+  border: 1px solid var(--border);
+  border-radius: 99px;
+  background: color-mix(in srgb, var(--panel) 70%, transparent);
+}
+
+/* ---- git slide animation */
+
+.gr-dot {
+  transform-box: fill-box;
+  transform-origin: center;
+}
+
+.deck-slide.active .gr-dot {
+  animation: gr-pop 0.34s cubic-bezier(0.34, 1.56, 0.64, 1) backwards;
+}
+
+.gr-link {
+  stroke-dasharray: 420;
+  stroke-dashoffset: 420;
+}
+
+.deck-slide.active .gr-link {
+  animation: gr-draw 0.55s ease-out 1.15s forwards;
+}
+
+.deck-slide.active .gr-link-out {
+  animation-delay: 1.55s;
+}
+
+.gr-fold-box,
+.gr-view {
+  opacity: 0;
+}
+
+.deck-slide.active .gr-fold-box {
+  animation: gr-fade 0.4s ease-out 1.05s forwards;
+}
+
+.deck-slide.active .gr-view {
+  animation: gr-fade 0.4s ease-out 1.8s forwards;
+}
+
+@keyframes gr-pop {
+  from {
+    transform: scale(0);
+    opacity: 0;
+  }
+}
+
+@keyframes gr-draw {
+  to {
+    stroke-dashoffset: 0;
+  }
+}
+
+@keyframes gr-fade {
+  to {
+    opacity: 1;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .deck-slide.active .gr-dot,
+  .deck-slide.active .gr-link,
+  .deck-slide.active .gr-fold-box,
+  .deck-slide.active .gr-view {
+    animation: none;
+  }
+  .gr-link {
+    stroke-dashoffset: 0;
+  }
+  .gr-fold-box,
+  .gr-view {
+    opacity: 1;
+  }
+}

@@ -2,6 +2,7 @@ import { useEffect, useRef } from 'react';
 import type { Channel, Message, Project } from '../types';
 import { useActors } from '../actors';
 import { Avatar } from './Avatar';
+import { IconComment, IconIssueDot, IconMerge, IconPR } from './icons';
 import { Composer } from './Composer';
 import { ProjectCard } from './ProjectCard';
 
@@ -29,14 +30,25 @@ function MessageRow({
 }) {
   const actor = useActors();
   const author = actor(message.authorId);
+  const kindIcon =
+    message.kind === 'merge' ? (
+      <IconMerge />
+    ) : message.kind === 'pr' ? (
+      <IconPR />
+    ) : message.kind === 'issue' ? (
+      <IconIssueDot />
+    ) : message.kind === 'comment' ? (
+      <IconComment />
+    ) : null;
   return (
-    <div className="msg">
+    <div className={`msg${message.kind ? ` msg-${message.kind}` : ''}`}>
       <Avatar actor={author} size={30} />
       <div className="msg-main">
         <div className="msg-head">
           <span className="msg-name">{author.name}</span>
           {author.kind !== 'human' ? <span className="badge">{author.kind}</span> : null}
           <span className="msg-time">{message.time}</span>
+          {kindIcon ? <span className={`msg-kind mk-${message.kind}`}>{kindIcon}</span> : null}
         </div>
         <p className="msg-text">{message.text}</p>
         {project ? (

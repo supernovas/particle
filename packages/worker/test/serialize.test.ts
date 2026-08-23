@@ -106,7 +106,7 @@ describe('serializeWorkspace', () => {
       authorId: 'github:ada',
       text: 'Deflake everything that failed twice.',
       projectId: 'prj_1',
-      time: '09:02',
+      time: '2:02 AM',
     });
   });
 
