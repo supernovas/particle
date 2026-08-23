@@ -1,0 +1,1 @@
+{"actor":"github:particle-agent[bot]","clock":{"lamport":1,"wall":"2026-08-23T21:10:50.000Z"},"data":{"source":{"kind":"github-issue","number":17,"repo":"supernovas/particle"},"title":"P3.G — particle-worker (Rust) + GCP runtime groundwork"},"id":"evt_01M0REJMMGE5RV9JH69M77JSAQ","parents":[],"project":"prj_01M0REJMMGPYV7Y3JW4VZWRAWJ","type":"project.created","v":0}
