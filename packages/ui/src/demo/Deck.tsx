@@ -1,6 +1,6 @@
 import { useEffect, useState, type ReactNode } from 'react';
 import { MockApp } from '../App';
-import { Logo } from '../components/icons';
+import { IconMoon, IconSun, Logo } from '../components/icons';
 import { Frame } from './Frame';
 import { Shader } from './Shader';
 import type { ShaderName } from './shaders';
@@ -141,9 +141,25 @@ const SLIDES: Slide[] = [
   },
 ];
 
+type Theme = 'light' | 'dark';
+
+function initialTheme(): Theme {
+  const fromUrl = new URLSearchParams(window.location.search).get('theme');
+  if (fromUrl === 'light' || fromUrl === 'dark') return fromUrl;
+  const saved = window.localStorage.getItem('particle-theme');
+  if (saved === 'light' || saved === 'dark') return saved;
+  return window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
+}
+
 export function Deck() {
   const [index, setIndex] = useState(0);
   const [replay, setReplay] = useState(0);
+  const [theme, setTheme] = useState<Theme>(initialTheme);
+
+  // Share the preference with the app, but never touch document-level state.
+  useEffect(() => {
+    window.localStorage.setItem('particle-theme', theme);
+  }, [theme]);
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
@@ -157,6 +173,8 @@ export function Deck() {
         setIndex((i) => Math.max(i - 1, 0));
       } else if (e.key === 'r') {
         setReplay((r) => r + 1);
+      } else if (e.key === 't') {
+        setTheme((t) => (t === 'dark' ? 'light' : 'dark'));
       } else if (e.key === 'f') {
         void document.documentElement.requestFullscreen?.();
       }
@@ -166,10 +184,12 @@ export function Deck() {
   }, []);
 
   return (
-    <div className="deck" data-theme="dark">
+    <div className="deck" data-theme={theme}>
       {SLIDES.map((slide, i) => (
         <section key={slide.id} className={`deck-slide${i === index ? ' active' : ''}`}>
-          {slide.bg ? <Shader name={slide.bg} active={i === index} /> : null}
+          {slide.bg ? (
+            <Shader name={slide.bg} active={i === index} light={theme === 'light'} />
+          ) : null}
           <div className="deck-content">{slide.render(i === index, replay)}</div>
         </section>
       ))}
@@ -183,7 +203,15 @@ export function Deck() {
           />
         ))}
       </div>
-      <div className="deck-hint">← → · r replays · f fullscreen</div>
+      <button
+        className="deck-theme icon-btn"
+        onClick={() => setTheme(theme === 'dark' ? 'light' : 'dark')}
+        aria-label="Toggle theme"
+        title="Toggle theme (t)"
+      >
+        {theme === 'dark' ? <IconSun /> : <IconMoon />}
+      </button>
+      <div className="deck-hint">← → · r replays · t theme · f fullscreen</div>
     </div>
   );
 }

@@ -44,7 +44,7 @@ export interface WorkspaceProps {
   startNote?: { href: string; label: string };
   onSendReply: (text: string) => void;
   onTogglePause?: () => void;
-  /** Inside the deck: pin dark, never touch document-level theme state. */
+  /** Inside the deck: inherit the host theme, never touch document-level state. */
   embedded?: boolean;
 }
 

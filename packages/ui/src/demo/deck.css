@@ -1,10 +1,11 @@
-/* Deck shell — VERY SIMPLE LARGE LETTERS on shader grounds. */
+/* Deck shell — VERY SIMPLE LARGE LETTERS on shader grounds. Fully token-
+   driven: the deck root carries data-theme, so both modes are first-class. */
 
 .deck {
   position: fixed;
   inset: 0;
-  background: #0e0e11;
-  color: #ebeae7;
+  background: var(--bg);
+  color: var(--text);
   overflow: hidden;
   font-family: var(--font);
 }
@@ -50,6 +51,8 @@
 /* -------- typography slides */
 
 .sl-center {
+  position: relative;
+  z-index: 0;
   flex: 1;
   display: flex;
   flex-direction: column;
@@ -58,6 +61,20 @@
   gap: 22px;
   padding: 6vh 8vw;
   text-align: center;
+}
+
+/* A soft scrim keeps LARGE SIMPLE LETTERS legible over any shader, any theme. */
+.sl-center::before {
+  content: '';
+  position: absolute;
+  z-index: -1;
+  inset: 8% 0;
+  background: radial-gradient(
+    ellipse 62% 58% at 50% 50%,
+    color-mix(in srgb, var(--bg) 78%, transparent) 0%,
+    color-mix(in srgb, var(--bg) 45%, transparent) 48%,
+    transparent 78%
+  );
 }
 
 .sl-title {
@@ -74,14 +91,14 @@
   max-width: 62ch;
   font-size: clamp(18px, 2.1vw, 27px);
   line-height: 1.45;
-  color: #b5b3ad;
+  color: var(--text-2);
   text-wrap: balance;
 }
 
 .sl-sub code {
   font-family: var(--font-mono);
   font-size: 0.92em;
-  color: #cfcdf8;
+  color: var(--accent);
 }
 
 .sl-kicker {
@@ -89,7 +106,7 @@
   font-weight: 650;
   letter-spacing: 0.16em;
   text-transform: uppercase;
-  color: #8d85f5;
+  color: var(--accent);
 }
 
 .sl-kicker-top {
@@ -103,10 +120,10 @@
 
 .sl-tag {
   padding: 5px 14px;
-  border: 1px solid #35353e;
+  border: 1px solid var(--border-strong);
   border-radius: 99px;
   font-size: 13.5px;
-  color: #a2a09b;
+  color: var(--text-2);
 }
 
 .sl-logo {
@@ -149,7 +166,7 @@
   font-size: clamp(48px, 6.5vw, 96px);
   font-weight: 700;
   letter-spacing: -0.02em;
-  color: #cfcdf8;
+  color: var(--accent);
 }
 
 .sl-stat-l {
@@ -157,7 +174,7 @@
   font-weight: 650;
   letter-spacing: 0.12em;
   text-transform: uppercase;
-  color: #6d6c68;
+  color: var(--text-3);
 }
 
 /* -------- framed workspace (timelapse + live demo) */
@@ -184,17 +201,15 @@
 .tl-frame {
   border-radius: 12px;
   overflow: hidden;
-  border: 1px solid #2c2c34;
-  box-shadow:
-    0 30px 80px rgba(0, 0, 0, 0.55),
-    0 0 0 1px rgba(0, 0, 0, 0.4);
+  border: 1px solid var(--border-strong);
+  box-shadow: 0 26px 70px rgba(0, 0, 0, 0.3);
 }
 
 .tl-scale {
   transform-origin: top left;
   display: flex;
   flex-direction: column;
-  background: #131316;
+  background: var(--panel);
 }
 
 .tl-chrome {
@@ -203,8 +218,8 @@
   gap: 7px;
   height: 38px;
   padding: 0 14px;
-  border-bottom: 1px solid #26262d;
-  background: #1a1a1f;
+  border-bottom: 1px solid var(--border);
+  background: var(--panel-2);
   flex-shrink: 0;
 }
 
@@ -212,14 +227,14 @@
   width: 11px;
   height: 11px;
   border-radius: 99px;
-  background: #35353e;
+  background: var(--border-strong);
 }
 
 .tl-url {
   margin-left: 10px;
   font-family: var(--font-mono);
   font-size: 12px;
-  color: #6d6c68;
+  color: var(--text-3);
 }
 
 .tl-app {
@@ -246,25 +261,25 @@
 .tl-caption {
   padding: 9px 22px;
   border-radius: 99px;
-  background: rgba(26, 26, 31, 0.92);
-  border: 1px solid #2c2c34;
+  background: color-mix(in srgb, var(--panel) 94%, transparent);
+  border: 1px solid var(--border-strong);
   font-size: clamp(15px, 1.6vw, 20px);
-  color: #ebeae7;
+  color: var(--text);
 }
 
 .tl-replay {
   padding: 8px 16px;
   border-radius: 99px;
-  border: 1px solid #35353e;
+  border: 1px solid var(--border-strong);
   background: none;
-  color: #a2a09b;
+  color: var(--text-2);
   font-size: 14px;
   cursor: pointer;
 }
 
 .tl-replay:hover {
-  color: #ebeae7;
-  border-color: #8d85f5;
+  color: var(--text);
+  border-color: var(--accent);
 }
 
 /* -------- chrome */
@@ -286,13 +301,13 @@
   border-radius: 99px;
   border: 0;
   padding: 0;
-  background: #35353e;
+  background: var(--border-strong);
   cursor: pointer;
   transition: background 0.2s;
 }
 
 .deck-dot.active {
-  background: #8d85f5;
+  background: var(--accent);
 }
 
 .deck-hint {
@@ -300,7 +315,14 @@
   right: 22px;
   bottom: 20px;
   font-size: 12px;
-  color: #4d4d52;
+  color: var(--text-3);
+  z-index: 5;
+}
+
+.deck-theme {
+  position: fixed;
+  left: 20px;
+  bottom: 14px;
   z-index: 5;
 }
 
