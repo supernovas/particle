@@ -1,7 +1,7 @@
 variable "project_id" {
   description = "GCP project that hosts the particle worker"
   type        = string
-  default     = "particle-production"
+  default     = "particle-production-506421"
 }
 
 variable "region" {

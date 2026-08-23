@@ -3,7 +3,7 @@
 One Debian VM (`particle-worker-0`) that builds the Rust worker from this repo and runs it
 under systemd, polling the workspace's project issues. No inbound traffic; the GitHub App
 credentials live in Secret Manager and reach the VM only through its dedicated service
-account. Project: `particle-production` by default.
+account. Project: `particle-production-506421` by default.
 
 ## Deploy
 
@@ -12,7 +12,7 @@ account. Project: `particle-production` by default.
 gcloud auth application-default login
 
 # 1. upload the app credentials (kept out of Terraform state on purpose)
-scripts/gcp-upload-secrets.sh particle-production
+scripts/gcp-upload-secrets.sh particle-production-506421
 
 # 2. provision
 cd infra/gcp

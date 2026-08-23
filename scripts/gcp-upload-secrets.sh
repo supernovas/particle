@@ -4,7 +4,7 @@
 # root (or anywhere — it cd's itself). Usage:
 #   scripts/gcp-upload-secrets.sh [project-id]
 set -euo pipefail
-PROJECT="${1:-particle-production}"
+PROJECT="${1:-particle-production-506421}"
 cd "$(dirname "$0")/.."
 
 for f in .particle/github-app.json .particle/github-app.private-key.pem; do
