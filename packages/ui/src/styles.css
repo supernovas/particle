@@ -1070,3 +1070,29 @@ code {
   color: var(--text-3);
   font-size: 13px;
 }
+
+/* ------------------------------------------------------------- issue list */
+
+a.side-item {
+  text-decoration: none;
+  color: var(--text-2);
+}
+
+.issue-plus {
+  width: 11px;
+  color: var(--accent);
+  font-weight: 650;
+  flex-shrink: 0;
+}
+
+.issue-new .side-item-title {
+  color: var(--accent);
+  font-weight: 550;
+}
+
+.issue-num {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  color: var(--text-3);
+  flex-shrink: 0;
+}

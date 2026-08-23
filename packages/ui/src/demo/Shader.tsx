@@ -10,7 +10,15 @@ void main() { gl_Position = vec4(a_pos, 0.0, 1.0); }
  * Fullscreen fragment-shader canvas. Renders only while `active`, freezes on
  * prefers-reduced-motion, caps DPR to keep projector GPUs comfortable.
  */
-export function Shader({ name, active }: { name: ShaderName; active: boolean }) {
+export function Shader({
+  name,
+  active,
+  light = false,
+}: {
+  name: ShaderName;
+  active: boolean;
+  light?: boolean;
+}) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
 
   useEffect(() => {
@@ -40,6 +48,7 @@ export function Shader({ name, active }: { name: ShaderName; active: boolean }) 
 
     const uTime = gl.getUniformLocation(program, 'u_time');
     const uRes = gl.getUniformLocation(program, 'u_res');
+    const uLight = gl.getUniformLocation(program, 'u_light');
     const still = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
     const start = performance.now();
     let frame = 0;
@@ -59,6 +68,7 @@ export function Shader({ name, active }: { name: ShaderName; active: boolean }) 
       resize();
       gl.uniform1f(uTime, still ? 12.0 : (performance.now() - start) / 1000);
       gl.uniform2f(uRes, canvas.width, canvas.height);
+      gl.uniform1f(uLight, light ? 1.0 : 0.0);
       gl.drawArrays(gl.TRIANGLES, 0, 3);
       if (!still) frame = requestAnimationFrame(draw);
     };
@@ -68,7 +78,7 @@ export function Shader({ name, active }: { name: ShaderName; active: boolean }) 
       cancelAnimationFrame(frame);
       gl.getExtension('WEBGL_lose_context')?.loseContext();
     };
-  }, [name, active]);
+  }, [name, active, light]);
 
   return <canvas ref={canvasRef} className="deck-shader" aria-hidden />;
 }

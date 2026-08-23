@@ -1,5 +1,15 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { ACTORS, CHANNELS, CURRENT_USER, MESSAGES, PROJECTS, REPO_URL, SIM, TURNS } from './data';
+import {
+  ACTORS,
+  CHANNELS,
+  CURRENT_USER,
+  MESSAGES,
+  MOCK_ISSUES,
+  PROJECTS,
+  REPO_URL,
+  SIM,
+  TURNS,
+} from './data';
 import { useLiveWorkspace, type WorkspacePayload } from './live';
 import type { Message, Project, Turn } from './types';
 import { Workspace } from './Workspace';
@@ -49,6 +59,8 @@ function LiveApp({
       projects={data.projects}
       turns={data.turns}
       currentUserId={data.currentUserId}
+      issues={data.issues}
+      newIssueUrl={data.workspace.newProjectUrl}
       workspaceLabel={data.workspace.repo}
       mode="live"
       modeHint={`Connected to the local worker · posting as ${data.workspace.operator}`}
@@ -75,7 +87,17 @@ function LiveApp({
   );
 }
 
-export function MockApp({ offline }: { offline: boolean }) {
+export function MockApp({
+  offline,
+  embedded,
+  theme,
+  onToggleTheme,
+}: {
+  offline: boolean;
+  embedded?: boolean;
+  theme?: 'light' | 'dark';
+  onToggleTheme?: () => void;
+}) {
   const [channelId, setChannelId] = useState('eng');
   const [projectId, setProjectId] = useState<string | null>('speed-up-ci');
   const [messages, setMessages] = useState<Message[]>(MESSAGES);
@@ -161,6 +183,8 @@ export function MockApp({ offline }: { offline: boolean }) {
       projects={projects}
       turns={turns}
       currentUserId={CURRENT_USER}
+      issues={MOCK_ISSUES}
+      newIssueUrl={`${REPO_URL}/issues/new`}
       workspaceLabel="Supernovas"
       mode="mock"
       modeHint={
@@ -202,6 +226,9 @@ export function MockApp({ offline }: { offline: boolean }) {
         ]);
       }}
       onTogglePause={togglePause}
+      embedded={embedded}
+      theme={theme}
+      onToggleTheme={onToggleTheme}
     />
   );
 }

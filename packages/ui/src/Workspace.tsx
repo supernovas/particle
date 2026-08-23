@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import type { Actor, ActorId, Channel, Message, Project, Turn } from './types';
+import type { OpenIssue } from './live';
 import { ActorsProvider } from './actors';
 import { ChannelView } from './components/ChannelView';
 import { ProjectPane } from './components/ProjectPane';
@@ -22,6 +23,9 @@ export interface WorkspaceProps {
   projects: Project[];
   turns: Turn[];
   currentUserId: ActorId;
+  /** Open issues that could become projects; shown in the sidebar when set. */
+  issues?: OpenIssue[];
+  newIssueUrl?: string;
   workspaceLabel: string;
   mode: 'live' | 'mock';
   modeHint?: string;
@@ -40,15 +44,23 @@ export interface WorkspaceProps {
   startNote?: { href: string; label: string };
   onSendReply: (text: string) => void;
   onTogglePause?: () => void;
+  /** Inside the deck: inherit the host theme, never touch document-level state. */
+  embedded?: boolean;
+  /** Controlled theme (the deck owns it); with onToggleTheme, the embedded toggle drives the host. */
+  theme?: Theme;
+  onToggleTheme?: () => void;
 }
 
 export function Workspace(props: WorkspaceProps) {
-  const [theme, setTheme] = useState<Theme>(initialTheme);
+  const [ownTheme, setOwnTheme] = useState<Theme>(props.embedded ? 'dark' : initialTheme);
+  const theme = props.theme ?? ownTheme;
+  const controlled = props.theme !== undefined;
 
   useEffect(() => {
+    if (props.embedded || controlled) return;
     document.documentElement.dataset.theme = theme;
     window.localStorage.setItem('particle-theme', theme);
-  }, [theme]);
+  }, [theme, props.embedded, controlled]);
 
   const projectsById = useMemo(
     () => Object.fromEntries(props.projects.map((p) => [p.id, p])),
@@ -70,6 +82,8 @@ export function Workspace(props: WorkspaceProps) {
           unreads={props.unreads}
           channelId={channel.id}
           projectId={props.projectId}
+          issues={props.issues}
+          newIssueUrl={props.newIssueUrl}
           theme={theme}
           currentUserId={props.currentUserId}
           workspaceLabel={props.workspaceLabel}
@@ -77,7 +91,9 @@ export function Workspace(props: WorkspaceProps) {
           modeHint={props.modeHint}
           onSelectChannel={props.onSelectChannel}
           onOpenProject={props.onJumpToProject}
-          onToggleTheme={() => setTheme(theme === 'dark' ? 'light' : 'dark')}
+          onToggleTheme={
+            props.onToggleTheme ?? (() => setOwnTheme(theme === 'dark' ? 'light' : 'dark'))
+          }
         />
         <ChannelView
           channel={channel}

@@ -15,6 +15,7 @@ import { loadConfig } from './config.ts';
 import { GithubIssuesChannel } from './channels/github.ts';
 import type { InboundMessage } from './channels/adapter.ts';
 import { InstallationTokenProvider, loadAppCreds } from './github/auth.ts';
+import type { OpenIssue } from './channels/github.ts';
 import { serializeWorkspace } from './serialize.ts';
 import { startServer, type UiServer } from './server.ts';
 import { openStore } from './store.ts';
@@ -128,6 +129,7 @@ async function main() {
   console.log(`particle-worker v0 — host ${config.host.repo}, app ${creds.slug} (#${creds.id})`);
 
   const projects = new Map<string, ProjectLog>();
+  let openIssues: OpenIssue[] = [];
   for (const event of await store.load()) {
     if (event.type === 'project.created') {
       const source = (event.data as ProjectCreated).source;
@@ -152,7 +154,7 @@ async function main() {
     const port = Number(process.env.PARTICLE_UI_PORT ?? 7455);
     server = startServer(
       {
-        payload: () => serializeWorkspace([...projects.values()], config, operator),
+        payload: () => serializeWorkspace([...projects.values()], config, operator, openIssues),
         async postMessage(projectId, body) {
           const log = [...projects.values()].find((l) => l.id === projectId);
           if (!log) return false;
@@ -233,6 +235,7 @@ async function main() {
   do {
     try {
       const messages = noPoll ? [] : await channel.poll();
+      if (!noPoll) openIssues = await channel.listOpen();
       // Re-evaluate replayed projects too: durable log evidence makes every tick idempotent.
       const touched = new Set(projects.keys());
       const fresh: ParticleEvent[] = [];

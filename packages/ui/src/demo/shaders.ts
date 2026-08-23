@@ -10,6 +10,7 @@ const PRELUDE = `
 precision highp float;
 uniform float u_time;
 uniform vec2 u_res;
+uniform float u_light;
 `;
 
 /** Orbiting particles — the namesake. Additive glow, slow lissajous paths. */
@@ -17,7 +18,7 @@ const ORBITS = `${PRELUDE}
 void main() {
   vec2 uv = (gl_FragCoord.xy - 0.5 * u_res) / u_res.y;
   float t = u_time * 0.18;
-  vec3 col = vec3(0.045, 0.045, 0.055);
+  vec3 acc = vec3(0.0);
   for (int i = 0; i < 42; i++) {
     float fi = float(i);
     float a = fi * 2.399963;             // golden angle
@@ -27,10 +28,14 @@ void main() {
     float d = length(uv - p);
     float glow = 0.0008 / (d * d + 0.0006) + 0.00003 / (d * d + 0.000012);
     vec3 tint = mix(vec3(0.42, 0.38, 0.95), vec3(0.30, 0.62, 0.95), fract(fi * 0.27));
-    col += glow * tint * 0.55;
+    acc += glow * tint * 0.55;
   }
+  vec3 base = mix(vec3(0.045, 0.045, 0.055), vec3(0.965, 0.963, 0.978), u_light);
+  float ink = clamp(dot(acc, vec3(0.45)), 0.0, 1.1);
+  vec3 col = base + acc * (1.0 - u_light) - ink * vec3(0.34, 0.46, 0.10) * u_light;
   float v = 1.0 - 0.55 * length(uv);
-  gl_FragColor = vec4(col * v, 1.0);
+  col *= mix(v, 0.955 + 0.045 * v, u_light);
+  gl_FragColor = vec4(col, 1.0);
 }
 `;
 
@@ -57,10 +62,15 @@ void main() {
   vec2 r = vec2(fbm(uv * 1.6 + 2.4 * q + vec2(1.7, 9.2)), fbm(uv * 1.6 + 2.4 * q + vec2(8.3, 2.8)));
   float f = fbm(uv * 1.6 + 2.6 * r);
   float bands = smoothstep(0.42, 0.5, abs(fract(f * 7.0 + t * 2.0) - 0.5));
-  vec3 base = mix(vec3(0.05, 0.05, 0.07), vec3(0.16, 0.13, 0.34), f * f * 1.4);
-  vec3 line = vec3(0.36, 0.32, 0.8) * (1.0 - bands) * 0.5;
+  vec3 baseD = mix(vec3(0.05, 0.05, 0.07), vec3(0.16, 0.13, 0.34), f * f * 1.4);
+  vec3 baseL = mix(vec3(0.972, 0.970, 0.985), vec3(0.885, 0.875, 0.960), f * f * 1.4);
+  vec3 base = mix(baseD, baseL, u_light);
+  float ink = (1.0 - bands);
+  vec3 col = base + vec3(0.36, 0.32, 0.8) * ink * 0.5 * (1.0 - u_light) -
+    vec3(0.34, 0.44, 0.11) * ink * 0.30 * u_light;
   float v = 1.0 - 0.5 * length(uv);
-  gl_FragColor = vec4((base + line) * v, 1.0);
+  col *= mix(v, 0.955 + 0.045 * v, u_light);
+  gl_FragColor = vec4(col, 1.0);
 }
 `;
 
@@ -79,10 +89,14 @@ void main() {
   }
   float s = m - log2(max(log2(dot(z, z)), 1.0));
   float g = clamp(s / 64.0, 0.0, 1.0);
-  vec3 col = mix(vec3(0.05, 0.05, 0.08), vec3(0.42, 0.36, 0.95), pow(g, 1.15));
-  col += vec3(0.7, 0.66, 1.0) * pow(g, 7.0) * 0.7;
+  vec3 colD = mix(vec3(0.05, 0.05, 0.08), vec3(0.42, 0.36, 0.95), pow(g, 1.15));
+  colD += vec3(0.7, 0.66, 1.0) * pow(g, 7.0) * 0.7;
+  vec3 colL = mix(vec3(0.972, 0.970, 0.988), vec3(0.47, 0.42, 0.90), pow(g, 1.35));
+  colL -= vec3(0.26, 0.34, 0.07) * pow(g, 7.0);
+  vec3 col = mix(colD, colL, u_light);
   float v = 1.0 - 0.45 * length(uv / 2.6);
-  gl_FragColor = vec4(col * v, 1.0);
+  col *= mix(v, 0.955 + 0.045 * v, u_light);
+  gl_FragColor = vec4(col, 1.0);
 }
 `;
 
@@ -99,10 +113,14 @@ void main() {
   }
   h /= 6.0;
   float line = smoothstep(0.06, 0.0, abs(fract(h * 3.0) - 0.5) * 0.33);
-  vec3 base = mix(vec3(0.045, 0.045, 0.06), vec3(0.1, 0.12, 0.24), h * 0.5 + 0.5);
-  vec3 col = base + vec3(0.3, 0.42, 0.85) * line * 0.35;
+  vec3 baseD = mix(vec3(0.045, 0.045, 0.06), vec3(0.1, 0.12, 0.24), h * 0.5 + 0.5);
+  vec3 baseL = mix(vec3(0.975, 0.973, 0.988), vec3(0.905, 0.910, 0.965), h * 0.5 + 0.5);
+  vec3 base = mix(baseD, baseL, u_light);
+  vec3 col = base + vec3(0.3, 0.42, 0.85) * line * 0.35 * (1.0 - u_light) -
+    vec3(0.32, 0.42, 0.10) * line * 0.28 * u_light;
   float v = 1.0 - 0.5 * length(uv);
-  gl_FragColor = vec4(col * v, 1.0);
+  col *= mix(v, 0.955 + 0.045 * v, u_light);
+  gl_FragColor = vec4(col, 1.0);
 }
 `;
 

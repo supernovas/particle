@@ -32,6 +32,13 @@ const defaultTiming: Timing = {
 };
 
 /** Bidirectional GitHub Issues channel with durable loop and delivery guards. */
+/** An open issue in the channel repo — surfaced in the UI as a candidate project. */
+export interface OpenIssue {
+  number: number;
+  title: string;
+  url: string;
+}
+
 export class IssueChannel implements ChannelAdapter {
   readonly name = 'github-issues';
   private readonly timing: Timing;
@@ -124,6 +131,18 @@ export class IssueChannel implements ChannelAdapter {
     }
     this.saveCursor();
     return messages;
+  }
+
+  /** All open issues — the UI's sidebar listing. */
+  async listOpen(): Promise<OpenIssue[]> {
+    const token = await this.tokens.get();
+    const issues = await this.listPages(
+      `/repos/${this.cfg.repo}/issues?state=open&per_page=100`,
+      token,
+    );
+    return issues
+      .filter((issue) => !issue.pull_request)
+      .map((issue) => ({ number: issue.number, title: issue.title, url: issue.html_url }));
   }
 
   private async listPages(path: string, token: string): Promise<any[]> {
