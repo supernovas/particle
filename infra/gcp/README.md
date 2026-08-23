@@ -38,6 +38,20 @@ terraform apply -replace=google_compute_instance.worker
 CI-built release binaries instead of on-VM builds are a known follow-up, tracked with the
 rest of Phase 3 in [#17](https://github.com/supernovas/particle/issues/17).
 
+## CI runners (self-hosted GitHub Actions)
+
+`runners.tf` adds `runner_count` (default 1) org-level self-hosted runner VMs
+(`particle-ci-runner-N`, labels `gcp,linux,x64`) that register themselves at boot by minting
+a registration token from the app credentials in Secret Manager. One-time org-admin setup:
+
+1. Grant the app the org permission **Self-hosted runners: Read and write**
+   (app settings → Permissions & events), and approve the change on the installation.
+2. Allow public repositories on the **Default** runner group
+   (org settings → Actions → Runner groups) — this repo is public.
+
+Fork PRs still require maintainer approval before workflows run on these machines; keep it
+that way. Bootstrap log on a runner VM: `/var/log/particle-runner-startup.log`.
+
 ## Teardown
 
 ```sh
