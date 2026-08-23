@@ -43,6 +43,9 @@ export interface ChannelAdapter {
 - Config: `mirror: true|false` per channel already parses in `config.ts`; honor it.
 - Rate limiting: batch `deliver` calls with ≥1s spacing; on `403` with
   `x-ratelimit-remaining: 0`, sleep until `x-ratelimit-reset`.
+- Pagination: follow `Link` headers on issue and comment listings — the Phase-0 poller reads
+  only the first page (100 items), which silently drops older threads once a project outgrows
+  it (the founding issue will).
 - Comment-edit semantics: v0 ignores edits/deletes (an edited comment does not re-prompt);
   note this in a code comment.
 
