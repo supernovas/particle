@@ -57,7 +57,9 @@ export function emptyState(projectId: string): ProjectState {
     title: '',
     status: 'open',
     messages: [],
-    tasks: {},
+    // Task ids come from events, so do not let inherited names such as
+    // `constructor` or the `__proto__` setter masquerade as stored tasks.
+    tasks: Object.create(null) as Record<string, TaskState>,
     artifacts: [],
     clock: 0,
     seen: new Set(),
@@ -123,7 +125,7 @@ function apply(state: ProjectState, event: ParticleEvent): void {
     }
     case 'task.created': {
       const data = event.data as TaskCreated;
-      if (!state.tasks[data.taskId]) {
+      if (!Object.hasOwn(state.tasks, data.taskId)) {
         state.tasks[data.taskId] = {
           id: data.taskId,
           title: data.title,

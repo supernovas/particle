@@ -145,6 +145,25 @@ describe('fold', () => {
     expect(state.seen.size).toBe(0);
   });
 
+  it.each(['constructor', '__proto__'])('folds inherited-looking task id %s', (taskId) => {
+    const planner = 'agent:planner/p1';
+    const implementer = 'agent:impl/i1';
+    const state = fold(PROJECT, [
+      event('task.created', planner, 1, {
+        taskId,
+        title: 'hostile key',
+        spec: 'must remain an ordinary task',
+        deps: [],
+      }),
+      event('task.claimed', implementer, 2, { taskId }),
+      event('task.updated', implementer, 3, { taskId, status: 'done' }),
+    ]);
+
+    expect(Object.hasOwn(state.tasks, taskId)).toBe(true);
+    expect(state.tasks[taskId]).toMatchObject({ id: taskId, status: 'done' });
+    expect(Object.hasOwn(stateToJson(state).tasks, taskId)).toBe(true);
+  });
+
   it('folds multiple projects independently in stable project order', () => {
     const other = newId('prj');
     const events = sampleEvents();
