@@ -42,6 +42,7 @@ resource "google_compute_instance" "worker" {
   machine_type              = var.machine_type
   zone                      = var.zone
   allow_stopping_for_update = true
+  tags                      = ["particle-web"]
 
   boot_disk {
     initialize_params {
@@ -52,9 +53,10 @@ resource "google_compute_instance" "worker" {
 
   network_interface {
     network = "default"
-    # Ephemeral external IP for egress (GitHub, crates.io). No inbound is
-    # needed — the worker polls. Swap for Cloud NAT when the fleet grows.
-    access_config {}
+    access_config {
+      # Static: particle.supernova.ai points here (Cloudflare A record).
+      nat_ip = google_compute_address.web.address
+    }
   }
 
   service_account {
@@ -66,6 +68,7 @@ resource "google_compute_instance" "worker" {
     project_id = var.project_id
     repo_url   = var.repo_url
     branch     = var.branch
+    web_domain = var.web_domain
   })
 
   depends_on = [

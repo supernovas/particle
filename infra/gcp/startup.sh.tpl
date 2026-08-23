@@ -2,56 +2,81 @@
 # particle worker VM bootstrap. Runs as root on every boot; a finished install
 # is detected and just (re)started. Redeploy by recreating the instance:
 #   terraform apply -replace=google_compute_instance.worker
+#
+# Two services share the VM:
+#   particle-worker  — Rust worker (/opt/particle/src), canonical Phase-3 daemon
+#   particle-ui      — TS worker (/opt/particle/app): ingest + /api + built UI
+#                      on loopback :7455, fronted by Caddy (TLS, read-only)
+# Separate checkouts because each worker keeps state in ./.particle of its cwd.
 set -euo pipefail
 exec >>/var/log/particle-startup.log 2>&1
 echo "=== particle startup $(date -Is) ==="
 
 SRC=/opt/particle/src
+APP=/opt/particle/app
 BIN=/opt/particle/bin/particle-worker
 
-if [ -x "$BIN" ]; then
-  systemctl restart particle-worker
+if [ -x "$BIN" ] && [ -d "$APP/node_modules" ]; then
+  systemctl restart particle-worker particle-ui caddy
   echo "already installed; restarted"
   exit 0
 fi
 
 export DEBIAN_FRONTEND=noninteractive
 apt-get update -q
-apt-get install -qy git build-essential pkg-config curl python3
+apt-get install -qy git build-essential pkg-config curl python3 \
+  debian-keyring debian-archive-keyring apt-transport-https
 
 id -u particle >/dev/null 2>&1 || useradd -r -m -s /usr/sbin/nologin particle
 
+# --- toolchains: rust (worker build), node 24 (TS worker + UI build), caddy ---
+export RUSTUP_HOME=/opt/rustup CARGO_HOME=/opt/cargo
+curl -fsSL https://sh.rustup.rs | sh -s -- -y --profile minimal --default-toolchain stable
+curl -fsSL https://deb.nodesource.com/setup_24.x | bash -
+curl -1sLf 'https://dl.cloudsmith.io/public/caddy/stable/gpg.key' \
+  | gpg --dearmor -o /usr/share/keyrings/caddy-stable-archive-keyring.gpg
+curl -1sLf 'https://dl.cloudsmith.io/public/caddy/stable/debian.deb.txt' \
+  >/etc/apt/sources.list.d/caddy-stable.list
+apt-get update -q
+apt-get install -qy nodejs caddy
+
+# --- rust worker ---
 mkdir -p /opt/particle/bin
 # A previous failed bootstrap may have left a partial clone behind; start
 # clean so retries (every boot) can actually succeed.
 rm -rf "$SRC"
 git clone --depth 1 --branch "${branch}" "${repo_url}" "$SRC"
-
-# Build with a system-wide toolchain kept out of any user home.
-export RUSTUP_HOME=/opt/rustup CARGO_HOME=/opt/cargo
-curl -fsSL https://sh.rustup.rs | sh -s -- -y --profile minimal --default-toolchain stable
 /opt/cargo/bin/cargo build --release --manifest-path "$SRC/rust/Cargo.toml"
 install -m 0755 "$SRC/rust/target/release/particle-worker" "$BIN"
 
+# --- product surface: TS worker + UI ---
+rm -rf "$APP"
+git clone --depth 1 --branch "${branch}" "${repo_url}" "$APP"
+cd "$APP"
+npm ci
+npm run build --workspace @particle/ui
+
 # App credentials come from Secret Manager via the instance service account;
-# they exist only on this disk, mode 0600, owned by the service user.
-mkdir -p "$SRC/.particle"
-TOKEN=$(curl -s -H "Metadata-Flavor: Google" \
+# each worker gets its own copy in its state dir, mode 0600.
+MTOKEN=$(curl -s -H "Metadata-Flavor: Google" \
   "http://metadata.google.internal/computeMetadata/v1/instance/service-accounts/default/token" \
   | python3 -c "import sys,json;print(json.load(sys.stdin)['access_token'])")
 fetch_secret() {
-  curl -sf -H "Authorization: Bearer $TOKEN" \
+  curl -sf -H "Authorization: Bearer $MTOKEN" \
     "https://secretmanager.googleapis.com/v1/projects/${project_id}/secrets/$1/versions/latest:access" \
     | python3 -c "import sys,json,base64;sys.stdout.buffer.write(base64.b64decode(json.load(sys.stdin)['payload']['data']))"
 }
-fetch_secret particle-github-app-json >"$SRC/.particle/github-app.json"
-fetch_secret particle-github-app-pem >"$SRC/.particle/github-app.private-key.pem"
-chown -R particle:particle "$SRC/.particle"
-chmod 600 "$SRC"/.particle/*
+for dir in "$SRC/.particle" "$APP/.particle"; do
+  mkdir -p "$dir"
+  fetch_secret particle-github-app-json >"$dir/github-app.json"
+  fetch_secret particle-github-app-pem >"$dir/github-app.private-key.pem"
+  chmod 600 "$dir"/*
+done
+chown -R particle:particle "$SRC" "$APP"
 
 cat >/etc/systemd/system/particle-worker.service <<'UNIT'
 [Unit]
-Description=particle worker
+Description=particle worker (rust)
 After=network-online.target
 Wants=network-online.target
 
@@ -66,7 +91,37 @@ RestartSec=10
 WantedBy=multi-user.target
 UNIT
 
-chown -R particle:particle "$SRC"
+cat >/etc/systemd/system/particle-ui.service <<'UNIT'
+[Unit]
+Description=particle workspace UI (ts worker)
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+User=particle
+WorkingDirectory=/opt/particle/app
+Environment=PARTICLE_UI_PORT=7455
+ExecStart=/usr/bin/npm run particle-worker
+Restart=always
+RestartSec=10
+
+[Install]
+WantedBy=multi-user.target
+UNIT
+
+# Public read-only: browsing and the live event stream work for anyone, but
+# nothing that appends events is reachable until identity lands (Phase 2).
+cat >/etc/caddy/Caddyfile <<CADDY
+${web_domain} {
+	@writes {
+		method POST PUT PATCH DELETE
+	}
+	respond @writes "read-only deployment" 403
+	reverse_proxy 127.0.0.1:7455
+}
+CADDY
+
 systemctl daemon-reload
-systemctl enable --now particle-worker
+systemctl enable --now particle-worker particle-ui
+systemctl restart caddy
 echo "=== particle startup done $(date -Is) ==="
