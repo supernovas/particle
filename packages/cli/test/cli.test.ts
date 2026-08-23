@@ -126,7 +126,17 @@ describe('particle post/status/log', () => {
       parents: [],
       data: { body: 'concurrent message\non two lines' },
     };
-    store.append([lateArrival, original[1]!]);
+    const futureEvent: ParticleEvent = {
+      v: 0,
+      id: 'evt_00000000000000000000000001',
+      type: 'future.signal' as ParticleEvent['type'],
+      project: original[0]!.project,
+      actor: 'github:zoe',
+      clock: { lamport: 3, wall: '2026-08-23T13:00:00.000Z' },
+      parents: [original[1]!.id],
+      data: { payload: 'future value' },
+    };
+    store.append([futureEvent, lateArrival, original[1]!]);
 
     const human = harness(cwd);
     expect(await run(['log', key], human.context)).toBe(0);
@@ -134,7 +144,8 @@ describe('particle post/status/log', () => {
     expect(humanLines[0]).toContain(
       'github:aaron  message.posted  concurrent message on two lines',
     );
-    expect(humanLines).toHaveLength(3);
+    expect(humanLines).toHaveLength(4);
+    expect(humanLines[3]).toContain('github:zoe  future.signal  {"payload":"future value"}');
 
     const json = harness(cwd);
     expect(await run(['log', key, '--json'], json.context)).toBe(0);
@@ -147,7 +158,9 @@ describe('particle post/status/log', () => {
       lateArrival.id,
       original[0]!.id,
       original[1]!.id,
+      futureEvent.id,
     ]);
+    expect(jsonEvents[3]).toEqual(futureEvent);
   });
 
   it('rejects unknown projects and missing post text', async () => {

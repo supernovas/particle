@@ -32,6 +32,8 @@ export function summarize(event: ParticleEvent): string {
       return `${oneLine(data.kind)} ${oneLine(data.locator)}`;
     case 'project.status':
       return oneLine(data.status);
+    default:
+      return oneLine(JSON.stringify(event.data) ?? '');
   }
 }
 
