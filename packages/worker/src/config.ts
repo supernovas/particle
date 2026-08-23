@@ -22,6 +22,7 @@ export function loadConfig(path = 'particle.yaml'): Config {
   const raw = parse(readFileSync(path, 'utf8')) as Record<string, any>;
   const host = raw?.host ?? {};
   const gh = raw?.channels?.['github-issues'] ?? {};
+  const poll = Number(gh['poll-interval-seconds'] ?? 15);
   if (typeof host.repo !== 'string' || !host.repo.includes('/')) {
     throw new Error(`${path}: host.repo must be "owner/name"`);
   }
@@ -32,7 +33,7 @@ export function loadConfig(path = 'particle.yaml'): Config {
         repo: typeof gh.repo === 'string' ? gh.repo : host.repo,
         label: typeof gh.label === 'string' ? gh.label : 'particle:project',
         seedIssues: Array.isArray(gh['seed-issues']) ? gh['seed-issues'].map(Number) : [],
-        pollIntervalSeconds: Number(gh['poll-interval-seconds'] ?? 15),
+        pollIntervalSeconds: Number.isFinite(poll) && poll >= 1 ? poll : 15,
         mirror: gh.mirror === true,
       },
     },

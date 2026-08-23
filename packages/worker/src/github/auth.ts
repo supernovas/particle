@@ -74,6 +74,8 @@ export async function ghJson(path: string, bearer: string, init: RequestInit = {
       ...(init.headers ?? {}),
     },
   });
-  if (!res.ok) throw new Error(`GET ${path}: ${res.status} ${await res.text()}`);
+  if (!res.ok) {
+    throw new Error(`${init.method ?? 'GET'} ${path}: ${res.status} ${await res.text()}`);
+  }
   return res.json();
 }

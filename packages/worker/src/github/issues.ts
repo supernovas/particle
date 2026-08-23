@@ -39,6 +39,8 @@ export class IssueChannel {
   }
 
   async poll(cursor: Cursor): Promise<{ prompts: Prompt[]; cursor: Cursor }> {
+    // Phase-0 limitation: listings read a single page (100 items); Link-header
+    // pagination lands with the full channel adapter (P1.T4).
     const token = await this.tokens.get();
     const issues = new Map<number, any>();
 
