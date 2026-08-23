@@ -71,6 +71,13 @@ resource "google_compute_instance" "ci_runner" {
   })
 
   depends_on = [google_project_service.apis]
+
+  lifecycle {
+    # The registration token in the startup script is consumed at first boot;
+    # every plan mints a fresh one, and that churn must not recreate healthy
+    # runners. Recreate explicitly with -replace when you actually mean it.
+    ignore_changes = [metadata_startup_script]
+  }
 }
 
 output "ci_runners" {
