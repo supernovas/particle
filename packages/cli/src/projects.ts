@@ -37,9 +37,9 @@ export function projectKey(state: ProjectState): string {
   return state.id;
 }
 
-export function loadProjects(store: EventStore): StoredProject[] {
+export async function loadProjects(store: EventStore): Promise<StoredProject[]> {
   const grouped = new Map<string, ParticleEvent[]>();
-  for (const event of store.load()) {
+  for (const event of await store.load()) {
     const events = grouped.get(event.project) ?? [];
     events.push(event);
     grouped.set(event.project, events);

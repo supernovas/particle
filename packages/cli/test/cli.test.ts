@@ -87,7 +87,7 @@ describe('particle post/status/log', () => {
     expect(await run(['post', '--project', key!, 'ship it'], postAgain.context)).toBe(0);
     expect(postAgain.out.join('')).toBe(`posted to ${key}\n`);
 
-    const events = openStore(join(cwd, '.particle')).load();
+    const events = await openStore(join(cwd, '.particle')).load();
     expect(events.map((event) => event.type)).toEqual([
       'project.created',
       'message.posted',
@@ -123,7 +123,7 @@ describe('particle post/status/log', () => {
     expect(await run(['status', key], fromSubdir.context)).toBe(0);
     expect(fromSubdir.out.join('')).toContain('from the root');
     expect(fromSubdir.out.join('')).toContain('2     0/0');
-    expect(openStore(join(root, '.particle')).load()).toHaveLength(3);
+    expect(await openStore(join(root, '.particle')).load()).toHaveLength(3);
     expect(existsSync(join(subdir, '.particle', 'journal.ndjson'))).toBe(false);
 
     writeFileSync(
@@ -145,7 +145,7 @@ describe('particle post/status/log', () => {
     await run(['post', 'canonical order'], posted.context);
     const key = posted.out.join('').match(/^created (.+)\n$/)![1]!;
     const store = openStore(join(cwd, '.particle'));
-    const original = store.load();
+    const original = await store.load();
     const lateArrival: ParticleEvent = {
       v: 0,
       id: 'evt_00000000000000000000000000',
@@ -166,7 +166,7 @@ describe('particle post/status/log', () => {
       parents: [original[1]!.id],
       data: { payload: 'future value' },
     };
-    store.append([futureEvent, lateArrival, original[1]!]);
+    await store.append([futureEvent, lateArrival, original[1]!]);
 
     const human = harness(cwd);
     expect(await run(['log', key], human.context)).toBe(0);

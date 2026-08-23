@@ -1,3 +1,5 @@
+import { chmodSync, writeFileSync } from 'node:fs';
+import { resolve } from 'node:path';
 import {
   fold,
   isConverged,
@@ -17,13 +19,34 @@ import { serializeWorkspace } from './serialize.ts';
 import { startServer, type UiServer } from './server.ts';
 import { openStore } from './store.ts';
 
-const STATE_DIR = '.particle';
+const STATE_DIR = process.env.PARTICLE_STATE_DIR ?? '.particle';
 const CURSOR_PATH = `${STATE_DIR}/cursor.json`;
 
 interface ProjectLog {
   id: string;
   key: string;
   events: ParticleEvent[];
+}
+
+/**
+ * Give the git store's pushes credentials without ever writing a long-lived
+ * secret: GIT_ASKPASS reads a token file that this refresher rewrites (from
+ * the app's installation-token provider) before every sync.
+ */
+function setupGitPushAuth(tokens: InstallationTokenProvider): () => Promise<void> {
+  const tokenFile = resolve(STATE_DIR, 'git-token');
+  const askpass = resolve(STATE_DIR, 'git-askpass.sh');
+  writeFileSync(
+    askpass,
+    `#!/bin/sh\ncase "$1" in\n  Username*) echo x-access-token ;;\n  *) cat ${JSON.stringify(tokenFile)} ;;\nesac\n`,
+  );
+  chmodSync(askpass, 0o700);
+  process.env.GIT_ASKPASS = askpass;
+  process.env.GIT_TERMINAL_PROMPT = '0';
+  return async () => {
+    writeFileSync(tokenFile, await tokens.get());
+    chmodSync(tokenFile, 0o600);
+  };
 }
 
 function lastClock(log: ProjectLog): Clock | undefined {
@@ -86,14 +109,17 @@ async function main() {
     creds.slug,
     CURSOR_PATH,
   );
-  const journal = openStore(STATE_DIR);
+  const journal = openStore(STATE_DIR, {
+    hostRepo: config.host.repo,
+    beforeSync: process.env.PARTICLE_STORE === 'git' ? setupGitPushAuth(tokens) : undefined,
+  });
   const operator = process.env.PARTICLE_OPERATOR ?? 'operator';
 
   console.log(`particle-worker v0 — host ${config.host.repo}, app ${creds.slug} (#${creds.id})`);
 
   const projects = new Map<string, ProjectLog>();
   let openIssues: OpenIssue[] = [];
-  for (const event of journal.load()) {
+  for (const event of await journal.load()) {
     if (event.type === 'project.created') {
       const source = (event.data as ProjectCreated).source;
       if (source.kind === 'github-issue') {
@@ -132,7 +158,7 @@ async function main() {
             data: { body },
           };
           log.events.push(event);
-          journal.append([event]);
+          await journal.append([event]);
           server?.broadcast();
           if (config.channels.githubIssues.mirror) {
             const state = fold(log.id, log.events);
@@ -171,7 +197,7 @@ async function main() {
         fresh.push(...messageToEvents(log, message, config.channels.githubIssues.repo, isNew));
         touched.add(message.projectKey);
       }
-      journal.append(fresh);
+      await journal.append(fresh);
       if (fresh.length > 0) server?.broadcast();
       if (config.channels.githubIssues.mirror) {
         for (const log of projects.values()) {
