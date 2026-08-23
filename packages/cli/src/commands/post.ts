@@ -50,7 +50,7 @@ export async function post(args: string[], context: CommandContext): Promise<num
   }
 
   const store = storeFor(context);
-  const projects = loadProjects(store);
+  const projects = await loadProjects(store);
   const requestedKey = parsed.values.project;
   const existing = requestedKey
     ? projects.find((project) => project.key === requestedKey)
@@ -94,7 +94,7 @@ export async function post(args: string[], context: CommandContext): Promise<num
     data: { body: text },
   };
   events.push(message);
-  store.append(events);
+  await store.append(events);
   context.stdout(`${existing ? 'posted to' : 'created'} ${key}\n`);
   return 0;
 }

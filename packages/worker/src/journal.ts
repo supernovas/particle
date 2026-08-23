@@ -3,8 +3,8 @@ import { dirname } from 'node:path';
 import type { ParticleEvent } from '@particle/core';
 
 export interface EventStore {
-  load(): ParticleEvent[];
-  append(events: ParticleEvent[]): void;
+  load(): Promise<ParticleEvent[]>;
+  append(events: ParticleEvent[]): Promise<void>;
 }
 
 /**
@@ -16,7 +16,7 @@ export class Journal implements EventStore {
     mkdirSync(dirname(path), { recursive: true });
   }
 
-  load(): ParticleEvent[] {
+  async load(): Promise<ParticleEvent[]> {
     if (!existsSync(this.path)) return [];
     return readFileSync(this.path, 'utf8')
       .split('\n')
@@ -24,7 +24,7 @@ export class Journal implements EventStore {
       .map((line) => JSON.parse(line) as ParticleEvent);
   }
 
-  append(events: ParticleEvent[]): void {
+  async append(events: ParticleEvent[]): Promise<void> {
     if (events.length === 0) return;
     appendFileSync(this.path, events.map((e) => JSON.stringify(e) + '\n').join(''));
   }

@@ -42,7 +42,7 @@ export async function status(args: string[], context: CommandContext): Promise<n
     return 2;
   }
   const key = positionals[0];
-  const projects = loadProjects(storeFor(context));
+  const projects = await loadProjects(storeFor(context));
   const selected = key ? projects.filter((project) => project.key === key) : projects;
   if (key && selected.length === 0) {
     context.stderr(`particle status: project not found: ${key}\n`);
