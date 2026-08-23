@@ -1,0 +1,1 @@
+{"actor":"github:particle-agent[bot]","clock":{"lamport":1,"wall":"2026-08-23T23:23:25.000Z"},"data":{"source":{"kind":"github-issue","number":46,"repo":"supernovas/particle"},"title":"P1.T4b — link projects to the code they produced (artifact ingestion)"},"id":"evt_01M0REZG3BE2GX7VMPSYRE133E","parents":[],"project":"prj_01M0REZG3B59B4VFHABMHAEVF6","type":"project.created","v":0}
