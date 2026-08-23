@@ -100,6 +100,11 @@ export function startServer(deps: ServerDeps, port: number, distDir?: string): U
         if (path.startsWith(dist) && existsSync(path) && statSync(path).isFile()) {
           res.writeHead(200, {
             'content-type': MIME[extname(path)] ?? 'application/octet-stream',
+            // Hashed assets are immutable; everything else must revalidate,
+            // or browsers heuristically cache stale index.html across builds.
+            'cache-control': rel.startsWith('assets/')
+              ? 'public, max-age=31536000, immutable'
+              : 'no-store',
           });
           res.end(readFileSync(path));
           return;
@@ -107,7 +112,7 @@ export function startServer(deps: ServerDeps, port: number, distDir?: string): U
         // SPA fallback for client-side routes.
         const index = join(dist, 'index.html');
         if (existsSync(index)) {
-          res.writeHead(200, { 'content-type': MIME['.html']! });
+          res.writeHead(200, { 'content-type': MIME['.html']!, 'cache-control': 'no-store' });
           res.end(readFileSync(index));
           return;
         }
