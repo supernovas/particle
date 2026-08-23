@@ -1,0 +1,17 @@
+[package]
+name = "particle-worker"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+description = "Particle worker daemon: mirrors channels into project event logs and folds state"
+
+[dependencies]
+particle-core = { path = "../particle-core" }
+serde = { workspace = true }
+serde_json = { workspace = true }
+serde_yaml = "0.9"
+anyhow = "1"
+jsonwebtoken = "9"
+time = { version = "0.3", features = ["formatting"] }
+tokio = { version = "1", features = ["macros", "rt-multi-thread", "time", "signal"] }
+reqwest = { version = "0.12", default-features = false, features = ["json", "rustls-tls"] }

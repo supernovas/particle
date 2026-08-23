@@ -3,5 +3,11 @@ dist/
 .DS_Store
 *.log
 
+# Rust / Terraform build state
+rust/target/
+.terraform/
+*.tfstate
+*.tfstate.*
+
 # Local credentials and worker state — never commit.
 .particle/
