@@ -63,7 +63,8 @@ a worker crash/restart never double-spawns an agent.
    log or in flight → start the remainder via `AgentRunner`, recording a `task.claimed` (or
    role-run marker event) _before_ starting the process.
 3. Restructure `main.ts`: poll channels → append events → fold → `tick` each touched
-   project → repeat. Keep `--once`.
+   project → repeat. Keep `--once`; `--no-poll` may be combined with it for an offline
+   daemon bootstrap smoke test that performs no channel reads.
 4. Simulation tests with a fake runner that scripts agent behavior (e.g. planner emits two
    tasks; implementers complete; reviewer rejects once then approves) — assert the project
    converges within budget and that replaying the same log causes zero new runs.
