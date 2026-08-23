@@ -174,10 +174,15 @@ async function main() {
   }
 
   let stopping = false;
-  process.on('SIGINT', () => {
+  let wake: (() => void) | undefined;
+  const stop = () => {
     stopping = true;
+    wake?.();
     console.log('\nstopping…');
-  });
+  };
+  // SIGTERM is how systemd asks nicely during a redeploy cutover.
+  process.on('SIGINT', stop);
+  process.on('SIGTERM', stop);
 
   do {
     try {
@@ -220,9 +225,12 @@ async function main() {
       console.error(`poll failed: ${(err as Error).message}`);
     }
     if (once || stopping) break;
-    await new Promise((resolve) =>
-      setTimeout(resolve, config.channels.githubIssues.pollIntervalSeconds * 1000),
-    );
+    await new Promise<void>((resolve) => {
+      wake = resolve;
+      const timer = setTimeout(resolve, config.channels.githubIssues.pollIntervalSeconds * 1000);
+      timer.unref?.();
+    });
+    wake = undefined;
   } while (!stopping);
   server?.close();
 }

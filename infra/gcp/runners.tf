@@ -26,30 +26,12 @@ variable "github_org" {
   default = "supernovas"
 }
 
-# The runner SA holds exactly one capability: resetting the worker VM, which
-# is how the deploy workflow ships main (the VM rebuilds from main at boot).
-# Custom role + IAM condition keep a compromised CI job down to "can reboot
-# the worker", nothing else — no secret access, no instance admin.
+# No IAM roles at all: deploys are gitops (the worker VM converges on main by
+# itself), so a compromised CI job reaching the metadata endpoint gets a token
+# that can do nothing.
 resource "google_service_account" "ci_runner" {
   account_id   = "particle-ci-runner"
   display_name = "particle CI runner"
-}
-
-resource "google_project_iam_custom_role" "worker_reset" {
-  role_id     = "particleWorkerReset"
-  title       = "particle worker reset"
-  permissions = ["compute.instances.reset", "compute.instances.get"]
-}
-
-resource "google_project_iam_member" "runner_resets_worker" {
-  project = var.project_id
-  role    = google_project_iam_custom_role.worker_reset.id
-  member  = "serviceAccount:${google_service_account.ci_runner.email}"
-
-  condition {
-    title      = "only-the-worker-vm"
-    expression = "resource.name.endsWith(\"/zones/${var.zone}/instances/particle-worker-0\")"
-  }
 }
 
 data "external" "runner_reg_token" {
@@ -80,12 +62,8 @@ resource "google_compute_instance" "ci_runner" {
   }
 
   service_account {
-    email = google_service_account.ci_runner.email
-    # compute scope is gated by the narrow IAM role above; IAM is the boundary.
-    scopes = [
-      "https://www.googleapis.com/auth/logging.write",
-      "https://www.googleapis.com/auth/compute",
-    ]
+    email  = google_service_account.ci_runner.email
+    scopes = ["https://www.googleapis.com/auth/logging.write"]
   }
 
   metadata_startup_script = templatefile("${path.module}/runner-startup.sh.tpl", {
