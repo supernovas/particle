@@ -1,0 +1,1 @@
+{"actor":"agent:planner/run_01M0RFSH2JFPHM31CTM5A20TEF","clock":{"lamport":5,"wall":"2026-08-23T23:37:46.966Z"},"data":{"status":"planning"},"id":"evt_01M0RFSH6NY8MDJQD5RQYGKR9Y","parents":["evt_01M0RF3EFMM18MBH1Z8J2GKKQ1"],"project":"prj_01M0REJMMFFMAKB7Q3KYYATQKA","type":"project.status","v":0}
