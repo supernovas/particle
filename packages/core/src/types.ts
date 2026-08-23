@@ -8,7 +8,7 @@ export interface Clock {
   wall: string;
 }
 
-export type EventType =
+export type KnownEventType =
   | 'project.created'
   | 'message.posted'
   | 'plan.proposed'
@@ -19,6 +19,12 @@ export type EventType =
   | 'review.posted'
   | 'artifact.linked'
   | 'project.status';
+
+/**
+ * Known v0 event types plus future event names. Folds ignore unknown names, but
+ * validators and stores must preserve them for forward compatibility.
+ */
+export type EventType = KnownEventType | (string & {});
 
 /**
  * The envelope every particle event shares. Events are immutable; project state

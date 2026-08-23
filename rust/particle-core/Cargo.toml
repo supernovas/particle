@@ -6,6 +6,7 @@ license.workspace = true
 description = "Particle protocol kernel: events, clocks, canonical order, deterministic fold"
 
 [dependencies]
+ryu-js = "1.0.3"
 serde = { workspace = true }
 serde_json = { workspace = true }
 ulid = "1"
