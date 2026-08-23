@@ -22,6 +22,9 @@ apt-get install -qy git build-essential pkg-config curl python3
 id -u particle >/dev/null 2>&1 || useradd -r -m -s /usr/sbin/nologin particle
 
 mkdir -p /opt/particle/bin
+# A previous failed bootstrap may have left a partial clone behind; start
+# clean so retries (every boot) can actually succeed.
+rm -rf "$SRC"
 git clone --depth 1 --branch "${branch}" "${repo_url}" "$SRC"
 
 # Build with a system-wide toolchain kept out of any user home.
