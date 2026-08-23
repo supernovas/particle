@@ -14,6 +14,8 @@
     "node": ">=22"
   },
   "scripts": {
+    "conformance": "node --import tsx spec/run-conformance.ts",
+    "conformance:bless": "node --import tsx spec/gen.ts --bless",
     "particle-worker": "tsx packages/worker/src/main.ts",
     "typecheck": "tsc --noEmit && npm run typecheck --workspace @particle/ui",
     "test": "vitest run",

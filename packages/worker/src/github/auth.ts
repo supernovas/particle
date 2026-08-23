@@ -64,8 +64,28 @@ export class InstallationTokenProvider {
   }
 }
 
-export async function ghJson(path: string, bearer: string, init: RequestInit = {}): Promise<any> {
-  const res = await fetch(`https://api.github.com${path}`, {
+export class GithubApiError extends Error {
+  constructor(
+    readonly method: string,
+    readonly path: string,
+    readonly status: number,
+    readonly rateLimitRemaining: string | null,
+    readonly rateLimitReset: string | null,
+    body: string,
+  ) {
+    super(`${method} ${path}: ${status} ${body}`);
+    this.name = 'GithubApiError';
+  }
+}
+
+export async function ghJsonResponse(
+  path: string,
+  bearer: string,
+  init: RequestInit = {},
+): Promise<{ data: any; headers: Headers }> {
+  const method = init.method ?? 'GET';
+  const url = path.startsWith('https://api.github.com/') ? path : `https://api.github.com${path}`;
+  const res = await fetch(url, {
     ...init,
     headers: {
       accept: 'application/vnd.github+json',
@@ -75,7 +95,18 @@ export async function ghJson(path: string, bearer: string, init: RequestInit = {
     },
   });
   if (!res.ok) {
-    throw new Error(`${init.method ?? 'GET'} ${path}: ${res.status} ${await res.text()}`);
+    throw new GithubApiError(
+      method,
+      path,
+      res.status,
+      res.headers.get('x-ratelimit-remaining'),
+      res.headers.get('x-ratelimit-reset'),
+      await res.text(),
+    );
   }
-  return res.json();
+  return { data: await res.json(), headers: res.headers };
+}
+
+export async function ghJson(path: string, bearer: string, init: RequestInit = {}): Promise<any> {
+  return (await ghJsonResponse(path, bearer, init)).data;
 }

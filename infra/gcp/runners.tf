@@ -10,9 +10,9 @@
 #   - the Default runner group allows public repositories
 
 variable "runner_count" {
-  description = "Number of CI runner VMs"
+  description = "Number of CI runner VMs; 2+ lets CI jobs and deploys run in parallel"
   type        = number
-  default     = 1
+  default     = 2
 }
 
 variable "runner_machine_type" {
@@ -26,11 +26,30 @@ variable "github_org" {
   default = "supernovas"
 }
 
-# No IAM roles at all: a compromised CI job reaching the metadata endpoint
-# gets a token that can do nothing.
+# The runner SA holds exactly one capability: resetting the worker VM, which
+# is how the deploy workflow ships main (the VM rebuilds from main at boot).
+# Custom role + IAM condition keep a compromised CI job down to "can reboot
+# the worker", nothing else — no secret access, no instance admin.
 resource "google_service_account" "ci_runner" {
   account_id   = "particle-ci-runner"
   display_name = "particle CI runner"
+}
+
+resource "google_project_iam_custom_role" "worker_reset" {
+  role_id     = "particleWorkerReset"
+  title       = "particle worker reset"
+  permissions = ["compute.instances.reset", "compute.instances.get"]
+}
+
+resource "google_project_iam_member" "runner_resets_worker" {
+  project = var.project_id
+  role    = google_project_iam_custom_role.worker_reset.id
+  member  = "serviceAccount:${google_service_account.ci_runner.email}"
+
+  condition {
+    title      = "only-the-worker-vm"
+    expression = "resource.name.endsWith(\"/zones/${var.zone}/instances/particle-worker-0\")"
+  }
 }
 
 data "external" "runner_reg_token" {
@@ -61,8 +80,12 @@ resource "google_compute_instance" "ci_runner" {
   }
 
   service_account {
-    email  = google_service_account.ci_runner.email
-    scopes = ["https://www.googleapis.com/auth/logging.write"]
+    email = google_service_account.ci_runner.email
+    # compute scope is gated by the narrow IAM role above; IAM is the boundary.
+    scopes = [
+      "https://www.googleapis.com/auth/logging.write",
+      "https://www.googleapis.com/auth/compute",
+    ]
   }
 
   metadata_startup_script = templatefile("${path.module}/runner-startup.sh.tpl", {
@@ -71,6 +94,13 @@ resource "google_compute_instance" "ci_runner" {
   })
 
   depends_on = [google_project_service.apis]
+
+  lifecycle {
+    # The registration token in the startup script is consumed at first boot;
+    # every plan mints a fresh one, and that churn must not recreate healthy
+    # runners. Recreate explicitly with -replace when you actually mean it.
+    ignore_changes = [metadata_startup_script]
+  }
 }
 
 output "ci_runners" {

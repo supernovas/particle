@@ -14,7 +14,7 @@ const config: Config = {
       mirror: false,
     },
   },
-  runner: { command: null },
+  runner: { command: null, timeoutSeconds: 900 },
 };
 
 let lamport = 0;

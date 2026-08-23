@@ -1,0 +1,1 @@
+{"actor":"agent:implementer/run_00000000000000000000000036","clock":{"lamport":6,"wall":"2026-08-23T20:00:06.000Z"},"data":{"kind":"pr","locator":"https://github.com/acme/widget/pull/8"},"id":"evt_00000000000000000000000006","parents":[],"project":"prj_00000000000000000000000001","type":"artifact.linked","v":0}

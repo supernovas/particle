@@ -1,0 +1,1 @@
+{"actor":"agent:alpha/run_0000000000000000000000003A","clock":{"lamport":1,"wall":"2026-08-23T20:33:21.000Z"},"data":{"source":{"kind":"github-issue","number":10,"repo":"supernovas/particle"},"title":"Octopus"},"id":"evt_000000000000000000000001YH","parents":[],"project":"prj_00000000000000000000000001","type":"project.created","v":0}

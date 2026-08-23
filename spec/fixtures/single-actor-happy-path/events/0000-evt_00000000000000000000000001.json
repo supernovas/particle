@@ -1,0 +1,1 @@
+{"actor":"github:alice","clock":{"lamport":1,"wall":"2026-08-23T20:00:01.000Z"},"data":{"source":{"kind":"github-issue","number":7,"repo":"acme/widget"},"title":"Ship the widget"},"id":"evt_00000000000000000000000001","parents":[],"project":"prj_00000000000000000000000001","type":"project.created","v":0}

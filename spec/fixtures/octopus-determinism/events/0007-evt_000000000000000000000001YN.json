@@ -1,0 +1,1 @@
+{"actor":"agent:gamma/run_0000000000000000000000003C","clock":{"lamport":4,"wall":"2026-08-23T20:33:25.000Z"},"data":{"taskId":"tsk_0000000000000000000000006C"},"id":"evt_000000000000000000000001YN","parents":[],"project":"prj_00000000000000000000000001","type":"task.claimed","v":0}

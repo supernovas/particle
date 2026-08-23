@@ -38,6 +38,17 @@ terraform apply -replace=google_compute_instance.worker
 CI-built release binaries instead of on-VM builds are a known follow-up, tracked with the
 rest of Phase 3 in [#17](https://github.com/supernovas/particle/issues/17).
 
+## Web: particle.supernova.ai
+
+The worker VM also serves the workspace UI. `web.tf` reserves a static IP (`terraform output
+web_ip`), opens 80/443 to the VM, and the startup script runs the TS worker (ingest +
+`/api` + built `packages/ui`) on loopback with Caddy in front — TLS via Let's Encrypt,
+**read-only** (non-GET `/api` calls are rejected until identity lands in Phase 2).
+
+DNS is on Cloudflare: create an A record `particle` → `web_ip` with proxying **off**
+(grey cloud); Caddy needs to answer the ACME challenge directly. Certificate issuance is
+automatic once the record resolves.
+
 ## CI runners (self-hosted GitHub Actions)
 
 `runners.tf` adds `runner_count` (default 1) org-level self-hosted runner VMs
