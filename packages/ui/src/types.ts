@@ -16,6 +16,7 @@ export interface Human {
   handle: string;
   /** Avatar tint, 0–360. */
   hue: number;
+  avatarUrl?: string;
   online?: boolean;
 }
 
@@ -25,6 +26,7 @@ export interface Agent {
   name: string;
   /** planner | implementer | reviewer | any future role */
   role: string;
+  avatarUrl?: string;
 }
 
 /** Integrations that post on their own behalf, e.g. the GitHub bridge. */
@@ -32,6 +34,7 @@ export interface AppActor {
   kind: 'app';
   id: ActorId;
   name: string;
+  avatarUrl?: string;
 }
 
 export type Actor = Human | Agent | AppActor;
@@ -103,6 +106,8 @@ export interface Message {
   text: string;
   /** When set, the message is a project prompt and renders the project card. */
   projectId?: string;
+  /** Repo-event flavor — drives the icon in channel streams. */
+  kind?: 'issue' | 'pr' | 'merge' | 'comment';
 }
 
 export interface Channel {

@@ -29,8 +29,13 @@ const snippet = (text, n = 110) => {
 
 const items = await pages(`/repos/${REPO}/issues?state=all&sort=created&direction=asc`);
 const events = [];
+const avatars = {};
+const face = (user) => {
+  if (user?.login && !avatars[user.login]) avatars[user.login] = user.avatar_url;
+};
 for (const item of items) {
   const isPr = Boolean(item.pull_request);
+  face(item.user);
   events.push({
     at: item.created_at,
     kind: isPr ? 'pr' : 'issue',
@@ -53,6 +58,7 @@ for (const item of items) {
 const comments = await pages(`/repos/${REPO}/issues/comments?sort=created&direction=asc`);
 for (const comment of comments) {
   const number = Number(comment.issue_url.split('/').pop());
+  face(comment.user);
   events.push({
     at: comment.created_at,
     kind: 'comment',
@@ -85,6 +91,8 @@ export interface RepoEvent {
 export const HISTORY: RepoEvent[] = [
 ${lines}
 ];
+
+export const AVATARS: Record<string, string> = ${JSON.stringify(avatars, null, 2).replace(/"([^"]+)":/g, "'$1':").replace(/"/g, "'")};
 `,
 );
 console.log(`wrote ${events.length} events`);

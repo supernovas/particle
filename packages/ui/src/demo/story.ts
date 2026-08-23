@@ -1,6 +1,6 @@
 import type { Actor, Message, Project } from '../types';
 import type { OpenIssue } from '../live';
-import { HISTORY, type RepoEvent } from './history';
+import { AVATARS, HISTORY, type RepoEvent } from './history';
 
 /**
  * Slide 4's replay: every issue, PR, and merge in this repo (see history.ts,
@@ -17,14 +17,16 @@ function hue(id: string): number {
 export const TL_ACTORS: Record<string, Actor> = {};
 for (const event of HISTORY) {
   if (TL_ACTORS[event.author]) continue;
+  const avatarUrl = AVATARS[event.author];
   TL_ACTORS[event.author] = event.author.endsWith('[bot]')
     ? event.author.startsWith('particle')
-      ? { kind: 'app', id: event.author, name: 'particle' }
+      ? { kind: 'app', id: event.author, name: 'particle' } // keeps the particle mark
       : {
           kind: 'agent',
           id: event.author,
           name: event.author.replace('[bot]', ''),
           role: 'reviewer',
+          avatarUrl,
         }
     : {
         kind: 'human',
@@ -32,6 +34,7 @@ for (const event of HISTORY) {
         name: event.author,
         handle: event.author,
         hue: hue(event.author),
+        avatarUrl,
         online: true,
       };
 }
@@ -98,6 +101,7 @@ export function timelapseState(count: number): TimelapseState {
     authorId: event.author,
     time: when(event.at),
     text: line(event),
+    kind: event.kind,
     projectId: event.number === 1 && event.kind === 'issue' ? 'bootstrap' : undefined,
   }));
   const issues: OpenIssue[] = shown

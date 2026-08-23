@@ -63,7 +63,10 @@ export function Sidebar(props: SidebarProps) {
           );
         })}
 
-        <div className="side-label">Projects</div>
+        <div className="side-label">
+          Projects
+          {ordered.length > 0 ? <span className="side-count">{ordered.length}</span> : null}
+        </div>
         {ordered.length === 0 ? <p className="side-empty">No projects yet.</p> : null}
         {ordered.map((p) => {
           const active = p.id === props.projectId;
@@ -82,7 +85,12 @@ export function Sidebar(props: SidebarProps) {
 
         {props.newIssueUrl ? (
           <>
-            <div className="side-label">Open issues</div>
+            <div className="side-label">
+              Open issues
+              {(props.issues ?? []).length > 0 ? (
+                <span className="side-count">{(props.issues ?? []).length}</span>
+              ) : null}
+            </div>
             <a
               className="side-item issue-new"
               href={props.newIssueUrl}

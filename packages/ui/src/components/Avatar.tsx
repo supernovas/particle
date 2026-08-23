@@ -15,6 +15,21 @@ function agentMark(name: string, role: string): string {
   return role[0].toUpperCase() + n;
 }
 
+function Face({ url }: { url: string }) {
+  return (
+    <img
+      className="avatar-img"
+      src={url}
+      alt=""
+      loading="lazy"
+      referrerPolicy="no-referrer"
+      onError={(e) => {
+        e.currentTarget.style.display = 'none';
+      }}
+    />
+  );
+}
+
 export function Avatar({ actor, size = 28 }: { actor: Actor; size?: number }) {
   const style = { width: size, height: size, fontSize: Math.round(size * 0.38) } as CSSProperties;
 
@@ -26,6 +41,7 @@ export function Avatar({ actor, size = 28 }: { actor: Actor; size?: number }) {
         title={actor.name}
       >
         {initials(actor.name)}
+        {actor.avatarUrl ? <Face url={actor.avatarUrl} /> : null}
       </span>
     );
   }
@@ -33,12 +49,14 @@ export function Avatar({ actor, size = 28 }: { actor: Actor; size?: number }) {
     return (
       <span className="avatar avatar-agent" style={style} title={`${actor.name} · ${actor.role}`}>
         {agentMark(actor.name, actor.role)}
+        {actor.avatarUrl ? <Face url={actor.avatarUrl} /> : null}
       </span>
     );
   }
   return (
     <span className="avatar avatar-app" style={style} title={actor.name}>
       <Logo size={Math.round(size * 0.66)} />
+      {actor.avatarUrl ? <Face url={actor.avatarUrl} /> : null}
     </span>
   );
 }

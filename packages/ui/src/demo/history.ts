@@ -1105,4 +1105,43 @@ export const HISTORY: RepoEvent[] = [
     author: 'greptile-apps[bot]',
     body: '<h3>Greptile Summary</h3> This PR enables the integrated TypeScript production worker with a pinned and const…',
   },
+  {
+    at: '2026-08-23T23:27:09Z',
+    kind: 'comment',
+    number: 42,
+    title: '',
+    author: 'greptile-apps[bot]',
+    body: '<h3>Greptile Summary</h3> This PR grants the worker service account access to the GitHub webhook secret, alig…',
+  },
+  {
+    at: '2026-08-23T23:27:14Z',
+    kind: 'comment',
+    number: 25,
+    title: '',
+    author: 'particle-agent[bot]',
+    body: 'done: P3.WEB (artifact: #31 + #37 merged) https://particle.supernova.ai serves the live workspace — 14 projec…',
+  },
+  {
+    at: '2026-08-23T23:27:14Z',
+    kind: 'comment',
+    number: 35,
+    title: '',
+    author: 'particle-agent[bot]',
+    body: 'done: P1.T3b (artifacts: #37 merged, refs live) Acceptance met, with a topology upgrade along the way: the **…',
+  },
+  {
+    at: '2026-08-23T23:27:15Z',
+    kind: 'comment',
+    number: 38,
+    title: '',
+    author: 'particle-agent[bot]',
+    body: 'Status: converge timer + staged redeploys + Caddy request-buffering are live in prod (final reset done; tonig…',
+  },
 ];
+
+export const AVATARS: Record<string, string> = {
+  drx: 'https://avatars.githubusercontent.com/u/233040?v=4',
+  wildkakapo: 'https://avatars.githubusercontent.com/u/716442?v=4',
+  'particle-agent[bot]': 'https://avatars.githubusercontent.com/u/319113681?v=4',
+  'greptile-apps[bot]': 'https://avatars.githubusercontent.com/in/867647?v=4',
+};
