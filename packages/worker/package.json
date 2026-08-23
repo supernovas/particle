@@ -3,6 +3,10 @@
   "version": "0.0.1",
   "private": true,
   "type": "module",
+  "exports": {
+    "./config": "./src/config.ts",
+    "./store": "./src/store.ts"
+  },
   "dependencies": {
     "@particle/core": "*",
     "yaml": "^2.5.0"
