@@ -1,0 +1,1 @@
+{"actor":"github:alice","clock":{"lamport":2,"wall":"2026-08-23T20:00:02.000Z"},"data":{"body":"Please build the widget.","via":"https://github.com/acme/widget/issues/7#issuecomment-1"},"id":"evt_00000000000000000000000002","parents":[],"project":"prj_00000000000000000000000001","type":"message.posted","v":0}

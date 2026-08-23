@@ -1,0 +1,1 @@
+{"actor":"agent:future/run_00000000000000000000000035","clock":{"lamport":1,"wall":"2026-08-23T20:00:51.000Z"},"data":{"opaque":{"answer":42}},"id":"evt_0000000000000000000000001K","parents":[],"project":"prj_00000000000000000000000001","type":"extension.example","v":0}
