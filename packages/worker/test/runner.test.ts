@@ -10,6 +10,7 @@ import {
   SubprocessRunner,
   ingestAgentEventLines,
   runnerEnvironment,
+  windowsTaskkillArgs,
   writeRolePrompt,
   type AgentRunContext,
 } from '../src/runner/index.ts';
@@ -193,6 +194,11 @@ describe('SubprocessRunner', () => {
       name: AgentRunError.name,
       message: 'agent process timed out after 75ms',
     });
+  });
+
+  it('targets the Windows process tree before escalating to a forced kill', () => {
+    expect(windowsTaskkillArgs(4242, false)).toEqual(['/pid', '4242', '/t']);
+    expect(windowsTaskkillArgs(4242, true)).toEqual(['/pid', '4242', '/t', '/f']);
   });
 
   it.skipIf(process.platform === 'win32')(

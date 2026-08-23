@@ -107,11 +107,10 @@ export class SubprocessRunner implements AgentRunner {
     let hardKill: Promise<void> | undefined;
     const timeout = setTimeout(() => {
       timedOut = true;
-      signalProcessTree(child, 'SIGTERM');
+      void signalProcessTree(child, 'SIGTERM');
       hardKill = new Promise((resolveKill) => {
         setTimeout(() => {
-          signalProcessTree(child, 'SIGKILL');
-          resolveKill();
+          void signalProcessTree(child, 'SIGKILL').then(resolveKill);
         }, this.terminationGraceMs);
       });
     }, this.timeoutMs);
@@ -186,26 +185,35 @@ function waitForChild(
   });
 }
 
-function signalProcessTree(child: ChildProcess, signal: NodeJS.Signals): void {
+async function signalProcessTree(child: ChildProcess, signal: NodeJS.Signals): Promise<void> {
   if (child.pid === undefined) return;
   try {
     if (process.platform === 'win32') {
-      if (signal === 'SIGKILL') {
-        const killer = spawn('taskkill', ['/pid', String(child.pid), '/t', '/f'], {
-          shell: false,
-          stdio: 'ignore',
-          windowsHide: true,
-        });
-        killer.on('error', () => undefined);
-      } else {
-        child.kill(signal);
-      }
+      // Windows has no POSIX process-group signal. Target the whole tree on the
+      // first attempt, while the root PID still identifies its descendants.
+      await runTaskkill(windowsTaskkillArgs(child.pid, signal === 'SIGKILL'));
     } else {
       process.kill(-child.pid, signal);
     }
   } catch {
     // A concurrently exiting process group is already in the desired state.
   }
+}
+
+export function windowsTaskkillArgs(pid: number, force: boolean): string[] {
+  return ['/pid', String(pid), '/t', ...(force ? ['/f'] : [])];
+}
+
+function runTaskkill(args: string[]): Promise<void> {
+  return new Promise((resolveKill) => {
+    const killer = spawn('taskkill', args, {
+      shell: false,
+      stdio: 'ignore',
+      windowsHide: true,
+    });
+    killer.once('error', () => resolveKill());
+    killer.once('close', () => resolveKill());
+  });
 }
 
 function errorMessage(error: unknown): string {
