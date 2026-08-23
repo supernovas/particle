@@ -1,9 +1,10 @@
 #!/bin/bash
-# particle worker VM bootstrap. Runs as root on every boot; a finished install
-# is detected and just (re)started. Redeploy by recreating the instance:
-#   terraform apply -replace=google_compute_instance.worker
+# particle worker VM bootstrap + redeploy. Runs as root on every boot; the
+# deploy workflow triggers it with a VM reset. Fast path when main hasn't
+# moved; otherwise a staged rebuild in *.new dirs swaps in at the end, so the
+# site serves the old build until seconds before cutover.
 #
-# Two services share the VM:
+# Services:
 #   particle-worker  — Rust worker (/opt/particle/src), canonical Phase-3 daemon
 #   particle-ui      — TS worker (/opt/particle/app): ingest + /api + built UI
 #                      on loopback :7455, fronted by Caddy (TLS, read-only)
@@ -12,47 +13,51 @@ set -euo pipefail
 exec >>/var/log/particle-startup.log 2>&1
 echo "=== particle startup $(date -Is) ==="
 
-SRC=/opt/particle/src
-APP=/opt/particle/app
-BIN=/opt/particle/bin/particle-worker
-
-if [ -x "$BIN" ] && [ -d "$APP/node_modules" ]; then
-  systemctl restart particle-worker particle-ui caddy
-  echo "already installed; restarted"
-  exit 0
-fi
+BASE=/opt/particle
+SRC=$BASE/src
+APP=$BASE/app
+BIN=$BASE/bin/particle-worker
+SHA_FILE=$BASE/installed-sha
 
 export DEBIAN_FRONTEND=noninteractive
 apt-get update -q
 apt-get install -qy git build-essential pkg-config curl python3 \
   debian-keyring debian-archive-keyring apt-transport-https
 
+REMOTE_SHA=$(git ls-remote "${repo_url}" "refs/heads/${branch}" | cut -f1)
+if [ -x "$BIN" ] && [ -d "$APP/node_modules" ] && [ -f "$SHA_FILE" ] \
+  && [ "$(cat "$SHA_FILE")" = "$REMOTE_SHA" ]; then
+  systemctl restart particle-worker particle-ui caddy
+  echo "up to date at $REMOTE_SHA; restarted"
+  exit 0
+fi
+
 id -u particle >/dev/null 2>&1 || useradd -r -m -s /usr/sbin/nologin particle
 
-# --- toolchains: rust (worker build), node 24 (TS worker + UI build), caddy ---
+# --- toolchains (each install skipped when already present) ---
 export RUSTUP_HOME=/opt/rustup CARGO_HOME=/opt/cargo
-curl -fsSL https://sh.rustup.rs | sh -s -- -y --profile minimal --default-toolchain stable
-curl -fsSL https://deb.nodesource.com/setup_24.x | bash -
-curl -1sLf 'https://dl.cloudsmith.io/public/caddy/stable/gpg.key' \
-  | gpg --dearmor -o /usr/share/keyrings/caddy-stable-archive-keyring.gpg
-curl -1sLf 'https://dl.cloudsmith.io/public/caddy/stable/debian.deb.txt' \
-  >/etc/apt/sources.list.d/caddy-stable.list
-apt-get update -q
-apt-get install -qy nodejs caddy
+[ -x /opt/cargo/bin/cargo ] || curl -fsSL https://sh.rustup.rs \
+  | sh -s -- -y --profile minimal --default-toolchain stable
+if ! command -v node >/dev/null; then
+  curl -fsSL https://deb.nodesource.com/setup_24.x | bash -
+  apt-get install -qy nodejs
+fi
+if ! command -v caddy >/dev/null; then
+  curl -1sLf 'https://dl.cloudsmith.io/public/caddy/stable/gpg.key' \
+    | gpg --dearmor -o /usr/share/keyrings/caddy-stable-archive-keyring.gpg
+  curl -1sLf 'https://dl.cloudsmith.io/public/caddy/stable/debian.deb.txt' \
+    >/etc/apt/sources.list.d/caddy-stable.list
+  apt-get update -q
+  apt-get install -qy caddy
+fi
 
-# --- rust worker ---
-mkdir -p /opt/particle/bin
-# A previous failed bootstrap may have left a partial clone behind; start
-# clean so retries (every boot) can actually succeed.
-rm -rf "$SRC"
-git clone --depth 1 --branch "${branch}" "${repo_url}" "$SRC"
-/opt/cargo/bin/cargo build --release --manifest-path "$SRC/rust/Cargo.toml"
-install -m 0755 "$SRC/rust/target/release/particle-worker" "$BIN"
-
-# --- product surface: TS worker + UI ---
-rm -rf "$APP"
-git clone --depth 1 --branch "${branch}" "${repo_url}" "$APP"
-cd "$APP"
+# --- staged build: nothing serving is touched until the swap below ---
+mkdir -p "$BASE/bin"
+rm -rf "$SRC.new" "$APP.new"
+git clone --depth 1 --branch "${branch}" "${repo_url}" "$SRC.new"
+git clone --depth 1 --branch "${branch}" "${repo_url}" "$APP.new"
+/opt/cargo/bin/cargo build --release --manifest-path "$SRC.new/rust/Cargo.toml"
+cd "$APP.new"
 npm ci
 npm run build --workspace @particle/ui
 
@@ -66,13 +71,13 @@ fetch_secret() {
     "https://secretmanager.googleapis.com/v1/projects/${project_id}/secrets/$1/versions/latest:access" \
     | python3 -c "import sys,json,base64;sys.stdout.buffer.write(base64.b64decode(json.load(sys.stdin)['payload']['data']))"
 }
-for dir in "$SRC/.particle" "$APP/.particle"; do
+for dir in "$SRC.new/.particle" "$APP.new/.particle"; do
   mkdir -p "$dir"
   fetch_secret particle-github-app-json >"$dir/github-app.json"
   fetch_secret particle-github-app-pem >"$dir/github-app.private-key.pem"
   chmod 600 "$dir"/*
 done
-chown -R particle:particle "$SRC" "$APP"
+chown -R particle:particle "$SRC.new" "$APP.new"
 
 cat >/etc/systemd/system/particle-worker.service <<'UNIT'
 [Unit]
@@ -121,7 +126,14 @@ ${web_domain} {
 }
 CADDY
 
+# --- cutover: seconds of downtime, then the new build serves ---
 systemctl daemon-reload
+install -m 0755 "$SRC.new/rust/target/release/particle-worker" "$BIN"
+systemctl stop particle-ui particle-worker 2>/dev/null || true
+rm -rf "$SRC" "$APP"
+mv "$SRC.new" "$SRC"
+mv "$APP.new" "$APP"
+echo "$REMOTE_SHA" >"$SHA_FILE"
 systemctl enable --now particle-worker particle-ui
 systemctl restart caddy
-echo "=== particle startup done $(date -Is) ==="
+echo "=== particle startup done at $REMOTE_SHA $(date -Is) ==="
