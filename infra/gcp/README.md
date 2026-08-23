@@ -27,13 +27,14 @@ First boot takes a few minutes (apt + rustup + `cargo build --release`); progres
 terraform output -raw logs_hint   # prints the journalctl ssh one-liner
 ```
 
-## Redeploy on a new commit
+## Deploys (gitops, zero downtime)
 
-The VM builds `var.branch` (default `main`) at boot and never auto-updates:
-
-```sh
-terraform apply -replace=google_compute_instance.worker
-```
+Merging to `main` is the deploy. A converge timer on the VM (60s) notices the new sha and
+runs a **staged** rebuild — rust and the UI compile in `*.new` dirs while the old build
+keeps serving, then a seconds-long cutover swaps them, which Caddy bridges with
+`lb_try_duration` so clients never see it (SSE streams auto-reconnect). Logs:
+`/var/log/particle-redeploy.log` on the VM. No workflow, no deploy credentials; the manual
+break-glass remains `terraform apply -replace=google_compute_instance.worker`.
 
 CI-built release binaries instead of on-VM builds are a known follow-up, tracked with the
 rest of Phase 3 in [#17](https://github.com/supernovas/particle/issues/17).
