@@ -1,5 +1,5 @@
 import { createHash } from 'node:crypto';
-import { mkdir, mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
+import { mkdir, mkdtemp, readFile, realpath, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
 import { runIn } from './git.ts';
@@ -42,12 +42,16 @@ export async function createTaskWorktree(
 /** Remove an isolated task worktree and its task branch. */
 export async function removeTaskWorktree(repoDir: string, path: string): Promise<void> {
   const ownership = await readOwnership(repoDir, path);
-  const branch = (await runIn(path, ['symbolic-ref', '--quiet', '--short', 'HEAD'])).trim();
-  if (branch !== ownership.branch) {
-    throw new Error(`task worktree branch does not match ownership marker: ${branch}`);
+  const registeredBranch = await registeredWorktreeBranch(repoDir, ownership.worktreePath);
+  if (registeredBranch && registeredBranch !== ownership.branch) {
+    throw new Error(`task worktree branch does not match ownership marker: ${registeredBranch}`);
   }
-  await runIn(repoDir, ['worktree', 'remove', '--force', path]);
-  await runIn(repoDir, ['branch', '-D', branch]);
+  if (registeredBranch) {
+    await runIn(repoDir, ['worktree', 'remove', '--force', path]);
+  }
+  if (await refExists(repoDir, `refs/heads/${ownership.branch}`)) {
+    await runIn(repoDir, ['branch', '-D', ownership.branch]);
+  }
   await rm(ownership.marker);
 }
 
@@ -91,8 +95,27 @@ async function refExists(repoDir: string, ref: string): Promise<boolean> {
   }
 }
 
+async function registeredWorktreeBranch(
+  repoDir: string,
+  path: string,
+): Promise<string | undefined> {
+  const expectedPath = resolve(path);
+  const blocks = (await runIn(repoDir, ['worktree', 'list', '--porcelain'])).split('\n\n');
+  for (const block of blocks) {
+    const lines = block.split('\n');
+    if (lines[0] !== `worktree ${expectedPath}`) continue;
+    const branch = lines.find((line) => line.startsWith('branch '));
+    if (!branch?.startsWith('branch refs/heads/')) {
+      throw new Error(`owned task worktree is not on a branch: ${expectedPath}`);
+    }
+    return branch.slice('branch refs/heads/'.length);
+  }
+  return undefined;
+}
+
 interface Ownership {
   path: string;
+  worktreePath: string;
   branch: string;
   marker: string;
 }
@@ -100,7 +123,8 @@ interface Ownership {
 async function writeOwnership(repoDir: string, path: string, branch: string): Promise<void> {
   const marker = await markerPath(repoDir, path);
   await mkdir(resolve(marker, '..'), { recursive: true });
-  await writeFile(marker, `${JSON.stringify({ path: resolve(path), branch })}\n`, { flag: 'wx' });
+  const ownership = { path: resolve(path), worktreePath: await realpath(path), branch };
+  await writeFile(marker, `${JSON.stringify(ownership)}\n`, { flag: 'wx' });
 }
 
 async function readOwnership(repoDir: string, path: string): Promise<Ownership> {
@@ -116,12 +140,19 @@ async function readOwnership(repoDir: string, path: string): Promise<Ownership> 
     value === null ||
     !('path' in value) ||
     value.path !== resolve(path) ||
+    !('worktreePath' in value) ||
+    typeof value.worktreePath !== 'string' ||
     !('branch' in value) ||
     typeof value.branch !== 'string'
   ) {
     throw new Error(`invalid task worktree ownership marker: ${marker}`);
   }
-  return { path: value.path as string, branch: value.branch, marker };
+  return {
+    path: value.path as string,
+    worktreePath: value.worktreePath,
+    branch: value.branch,
+    marker,
+  };
 }
 
 async function markerPath(repoDir: string, path: string): Promise<string> {

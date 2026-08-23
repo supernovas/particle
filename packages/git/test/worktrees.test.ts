@@ -101,4 +101,39 @@ describe('task worktrees', () => {
     await exec('git', ['-C', repoDir, 'branch', '-D', 'particle/unrelated/manual']);
     roots.splice(roots.indexOf(path), 1);
   });
+
+  it('retries branch cleanup after a partial removal', async () => {
+    const repoDir = await mkdtemp(join(tmpdir(), 'particle-worktrees-retry-'));
+    roots.push(repoDir);
+    await exec('git', ['init', '-b', 'main', repoDir]);
+    await exec('git', ['-C', repoDir, 'config', 'user.name', 'test']);
+    await exec('git', ['-C', repoDir, 'config', 'user.email', 'test@example.com']);
+    await writeFile(join(repoDir, 'README.md'), 'root\n');
+    await exec('git', ['-C', repoDir, 'add', 'README.md']);
+    await exec('git', ['-C', repoDir, 'commit', '-m', 'initial']);
+    const path = await createTaskWorktree(repoDir, 'prj_retry', 'tsk_retry');
+    roots.push(path);
+    const competingPath = await mkdtemp(join(tmpdir(), 'particle-worktrees-competing-'));
+    roots.push(competingPath);
+    await exec('git', [
+      '-C',
+      repoDir,
+      'worktree',
+      'add',
+      '--force',
+      '--force',
+      competingPath,
+      'particle/prj_retry/tsk_retry',
+    ]);
+
+    await expect(removeTaskWorktree(repoDir, path)).rejects.toThrow();
+    await expect(readFile(join(path, 'README.md'))).rejects.toThrow();
+    roots.splice(roots.indexOf(path), 1);
+
+    await exec('git', ['-C', repoDir, 'worktree', 'remove', '--force', competingPath]);
+    roots.splice(roots.indexOf(competingPath), 1);
+    await expect(removeTaskWorktree(repoDir, path)).resolves.toBeUndefined();
+    const { stdout: branches } = await exec('git', ['-C', repoDir, 'branch', '--list']);
+    expect(branches).not.toContain('particle/prj_retry/tsk_retry');
+  });
 });
