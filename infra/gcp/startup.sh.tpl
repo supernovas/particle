@@ -1,36 +1,25 @@
 #!/bin/bash
-# particle worker VM bootstrap + redeploy. Runs as root on every boot; the
-# deploy workflow triggers it with a VM reset. Fast path when main hasn't
-# moved; otherwise a staged rebuild in *.new dirs swaps in at the end, so the
-# site serves the old build until seconds before cutover.
+# particle worker VM bootstrap. Runs as root at boot; installs toolchains,
+# services, and the converge timer, then hands off to particle-redeploy.
+#
+# Deploys are gitops: a 60s timer compares main against the installed sha and
+# runs a staged rebuild in place — the site keeps serving the old build until
+# a seconds-long cutover, which Caddy bridges by holding requests
+# (lb_try_duration). No VM resets, no reboot, no deploy credentials anywhere.
 #
 # Services:
-#   particle-worker  — Rust worker (/opt/particle/src), canonical Phase-3 daemon
-#   particle-ui      — TS worker (/opt/particle/app): ingest + /api + built UI
-#                      on loopback :7455, fronted by Caddy (TLS, read-only)
-# Separate checkouts because each worker keeps state in ./.particle of its cwd.
+#   particle-worker    — Rust worker (/opt/particle/src), canonical Phase-3 daemon
+#   particle-ui        — TS worker (/opt/particle/app): ingest + /api + built UI
+#                        on loopback :7455, fronted by Caddy (TLS, read-only)
+#   particle-redeploy  — oneshot staged rebuild, fired by timer and at boot
 set -euo pipefail
 exec >>/var/log/particle-startup.log 2>&1
 echo "=== particle startup $(date -Is) ==="
-
-BASE=/opt/particle
-SRC=$BASE/src
-APP=$BASE/app
-BIN=$BASE/bin/particle-worker
-SHA_FILE=$BASE/installed-sha
 
 export DEBIAN_FRONTEND=noninteractive
 apt-get update -q
 apt-get install -qy git build-essential pkg-config curl python3 \
   debian-keyring debian-archive-keyring apt-transport-https
-
-REMOTE_SHA=$(git ls-remote "${repo_url}" "refs/heads/${branch}" | cut -f1)
-if [ -x "$BIN" ] && [ -d "$APP/node_modules" ] && [ -f "$SHA_FILE" ] \
-  && [ "$(cat "$SHA_FILE")" = "$REMOTE_SHA" ]; then
-  systemctl restart particle-worker particle-ui caddy
-  echo "up to date at $REMOTE_SHA; restarted"
-  exit 0
-fi
 
 id -u particle >/dev/null 2>&1 || useradd -r -m -s /usr/sbin/nologin particle
 
@@ -51,8 +40,32 @@ if ! command -v caddy >/dev/null; then
   apt-get install -qy caddy
 fi
 
-# --- staged build: nothing serving is touched until the swap below ---
-mkdir -p "$BASE/bin"
+mkdir -p /opt/particle/bin
+
+# --- the redeploy script: staged build, cutover only on a new sha ---
+cat >/opt/particle/bin/particle-redeploy <<'REDEPLOY'
+#!/bin/bash
+set -euo pipefail
+exec 9>/var/lock/particle-redeploy
+flock -n 9 || exit 0
+exec >>/var/log/particle-redeploy.log 2>&1
+
+BASE=/opt/particle
+SRC=$BASE/src
+APP=$BASE/app
+BIN=$BASE/bin/particle-worker
+SHA_FILE=$BASE/installed-sha
+STATE=$BASE/state
+export RUSTUP_HOME=/opt/rustup CARGO_HOME=/opt/cargo
+
+REMOTE_SHA=$(git ls-remote "${repo_url}" "refs/heads/${branch}" | cut -f1)
+if [ -x "$BIN" ] && [ -d "$APP/node_modules" ] && [ -f "$SHA_FILE" ] \
+  && [ "$(cat "$SHA_FILE")" = "$REMOTE_SHA" ]; then
+  exit 0
+fi
+echo "=== redeploy to $REMOTE_SHA $(date -Is) ==="
+
+# Staged: nothing serving is touched until the swap at the end.
 rm -rf "$SRC.new" "$APP.new"
 git clone --depth 1 --branch "${branch}" "${repo_url}" "$SRC.new"
 git clone --depth 1 --branch "${branch}" "${repo_url}" "$APP.new"
@@ -61,13 +74,9 @@ cd "$APP.new"
 npm ci
 npm run build --workspace @particle/ui
 
-# App credentials come from Secret Manager via the instance service account.
-# The TS worker's state dir lives OUTSIDE the deploy blast radius at
-# /opt/particle/state: with PARTICLE_STORE=git its contents mirror
-# refs/particle/* on the host repo, so even losing the disk loses nothing —
-# a fresh machine recovers by fetching. The Rust worker keeps its per-clone
-# journal until it speaks the ref store.
-STATE=/opt/particle/state
+# App credentials from Secret Manager via the instance service account. The
+# TS worker's durable state dir lives outside the deploy blast radius; with
+# PARTICLE_STORE=git its contents mirror refs/particle/* on the host repo.
 MTOKEN=$(curl -s -H "Metadata-Flavor: Google" \
   "http://metadata.google.internal/computeMetadata/v1/instance/service-accounts/default/token" \
   | python3 -c "import sys,json;print(json.load(sys.stdin)['access_token'])")
@@ -82,7 +91,21 @@ for dir in "$SRC.new/.particle" "$STATE"; do
   fetch_secret particle-github-app-pem >"$dir/github-app.private-key.pem"
   chmod 600 "$dir"/github-app.*
 done
+fetch_secret particle-github-webhook-secret >"$STATE/webhook-secret"
+chmod 600 "$STATE/webhook-secret"
 chown -R particle:particle "$SRC.new" "$APP.new" "$STATE"
+
+# Cutover: seconds; Caddy buffers requests across the restart window.
+install -m 0755 "$SRC.new/rust/target/release/particle-worker" "$BIN"
+systemctl stop particle-ui particle-worker 2>/dev/null || true
+rm -rf "$SRC" "$APP"
+mv "$SRC.new" "$SRC"
+mv "$APP.new" "$APP"
+echo "$REMOTE_SHA" >"$SHA_FILE"
+systemctl start particle-worker particle-ui
+echo "=== redeploy done at $REMOTE_SHA $(date -Is) ==="
+REDEPLOY
+chmod 0755 /opt/particle/bin/particle-redeploy
 
 cat >/etc/systemd/system/particle-worker.service <<'UNIT'
 [Unit]
@@ -121,26 +144,101 @@ RestartSec=10
 WantedBy=multi-user.target
 UNIT
 
+cat >/etc/systemd/system/particle-redeploy.service <<'UNIT'
+[Unit]
+Description=particle converge-on-main (staged redeploy)
+
+[Service]
+Type=oneshot
+ExecStart=/opt/particle/bin/particle-redeploy
+UNIT
+
+cat >/etc/systemd/system/particle-redeploy.timer <<'UNIT'
+[Unit]
+Description=particle converge-on-main fallback (webhook is the fast path)
+
+[Timer]
+OnBootSec=90
+OnUnitActiveSec=60
+
+[Install]
+WantedBy=timers.target
+UNIT
+
+# The fast path: GitHub delivers push events here (~1s after a merge). The
+# listener verifies the app webhook's HMAC and kicks particle-redeploy.
+cat >/opt/particle/bin/particle-hooks.py <<'HOOKS'
+#!/usr/bin/env python3
+import hashlib, hmac, json, subprocess
+from http.server import BaseHTTPRequestHandler, HTTPServer
+
+SECRET = open('/opt/particle/state/webhook-secret', 'rb').read().strip()
+
+class Handler(BaseHTTPRequestHandler):
+    def do_POST(self):
+        if self.path != '/hooks/github':
+            self.send_response(404); self.end_headers(); return
+        body = self.rfile.read(int(self.headers.get('content-length', 0) or 0))
+        sig = self.headers.get('x-hub-signature-256', '')
+        expected = 'sha256=' + hmac.new(SECRET, body, hashlib.sha256).hexdigest()
+        if not hmac.compare_digest(sig, expected):
+            self.send_response(401); self.end_headers(); return
+        try:
+            payload = json.loads(body)
+        except Exception:
+            payload = {}
+        if self.headers.get('x-github-event') == 'push' and payload.get('ref') == 'refs/heads/${branch}':
+            subprocess.Popen(['systemctl', 'start', '--no-block', 'particle-redeploy'])
+        self.send_response(202); self.end_headers(); self.wfile.write(b'ok')
+
+    def log_message(self, *args):
+        pass
+
+HTTPServer(('127.0.0.1', 7456), Handler).serve_forever()
+HOOKS
+chmod 0755 /opt/particle/bin/particle-hooks.py
+
+cat >/etc/systemd/system/particle-hooks.service <<'UNIT'
+[Unit]
+Description=particle github webhook listener
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+ExecStart=/usr/bin/python3 /opt/particle/bin/particle-hooks.py
+Restart=always
+RestartSec=5
+
+[Install]
+WantedBy=multi-user.target
+UNIT
+
 # Public read-only: browsing and the live event stream work for anyone, but
 # nothing that appends events is reachable until identity lands (Phase 2).
+# lb_try_duration bridges the redeploy cutover so clients never see it.
 cat >/etc/caddy/Caddyfile <<CADDY
 ${web_domain} {
-	@writes {
-		method POST PUT PATCH DELETE
+	handle /hooks/github {
+		reverse_proxy 127.0.0.1:7456
 	}
-	respond @writes "read-only deployment" 403
-	reverse_proxy 127.0.0.1:7455
+	handle {
+		@writes {
+			method POST PUT PATCH DELETE
+		}
+		respond @writes "read-only deployment" 403
+		reverse_proxy 127.0.0.1:7455 {
+			lb_try_duration 20s
+			lb_try_interval 250ms
+		}
+	}
 }
 CADDY
 
-# --- cutover: seconds of downtime, then the new build serves ---
 systemctl daemon-reload
-install -m 0755 "$SRC.new/rust/target/release/particle-worker" "$BIN"
-systemctl stop particle-ui particle-worker 2>/dev/null || true
-rm -rf "$SRC" "$APP"
-mv "$SRC.new" "$SRC"
-mv "$APP.new" "$APP"
-echo "$REMOTE_SHA" >"$SHA_FILE"
-systemctl enable --now particle-worker particle-ui
+systemctl enable particle-worker particle-ui
+systemctl enable --now particle-redeploy.timer
 systemctl restart caddy
-echo "=== particle startup done at $REMOTE_SHA $(date -Is) ==="
+/opt/particle/bin/particle-redeploy
+# After redeploy so the webhook secret exists in the state dir.
+systemctl enable --now particle-hooks
+echo "=== particle startup done $(date -Is) ==="
