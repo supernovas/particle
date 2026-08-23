@@ -105,8 +105,14 @@ export function actorHue(id: string): number {
   return h;
 }
 
+const TIME = new Intl.DateTimeFormat('en-US', {
+  timeZone: 'America/Los_Angeles',
+  hour: 'numeric',
+  minute: '2-digit',
+});
+
 function hhmm(iso: string): string {
-  return iso.slice(11, 16);
+  return TIME.format(new Date(iso));
 }
 
 function uiActor(id: ActorId): UiActor {

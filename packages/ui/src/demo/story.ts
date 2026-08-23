@@ -38,14 +38,42 @@ for (const event of HISTORY) {
 
 const REPO_URL = 'https://github.com/supernovas/particle';
 
+const WHEN = new Intl.DateTimeFormat('en-US', {
+  timeZone: 'America/Los_Angeles',
+  month: 'short',
+  day: 'numeric',
+  hour: 'numeric',
+  minute: '2-digit',
+});
+
+/** "Aug 23 · 1:06 PM" (PST) */
+export function when(iso: string): string {
+  return WHEN.format(new Date(iso)).replace(', ', ' · ');
+}
+
 function line(event: RepoEvent): string {
   switch (event.kind) {
     case 'issue':
-      return `#${event.number} opened — ${event.title}`;
+      return event.body
+        ? `#${event.number} opened — ${event.title}\n“${event.body}”`
+        : `#${event.number} opened — ${event.title}`;
     case 'pr':
       return `PR #${event.number} — ${event.title}`;
     case 'merge':
       return `merged #${event.number} — ${event.title}`;
+    case 'comment':
+      return `on #${event.number} — “${event.body}”`;
+  }
+}
+
+function captionLine(event: RepoEvent): string {
+  switch (event.kind) {
+    case 'comment':
+      return `${event.author} on #${event.number}`;
+    case 'merge':
+      return `merged #${event.number} — ${event.title}`;
+    default:
+      return `#${event.number} — ${event.title}`;
   }
 }
 
@@ -68,7 +96,7 @@ export function timelapseState(count: number): TimelapseState {
     id: `h${i}`,
     channelId: 'github-issues',
     authorId: event.author,
-    time: event.at.slice(11, 16),
+    time: when(event.at),
     text: line(event),
     projectId: event.number === 1 && event.kind === 'issue' ? 'bootstrap' : undefined,
   }));
@@ -101,7 +129,7 @@ export function timelapseState(count: number): TimelapseState {
   const caption = done
     ? `${TOTAL} updates · one day · 2 humans and a fleet of agents`
     : last
-      ? `${shown.length}/${TOTAL} · ${line(last)}`
+      ? `${shown.length}/${TOTAL} · ${captionLine(last)}`
       : 'day zero';
 
   return { messages, projects, issues, caption, done };
