@@ -89,6 +89,17 @@ fn load_cursor(path: &Path) -> Result<Cursor> {
     Ok(serde_json::from_str(&fs::read_to_string(path)?)?)
 }
 
+/// Write-then-rename so a crash mid-write can never leave a torn cursor file.
+/// (A crash between journal append and this save still re-emits prompts as
+/// duplicate events on restart — that window closes with the CAS ref store,
+/// P1.T3.)
+fn save_cursor(path: &Path, cursor: &Cursor) -> Result<()> {
+    let tmp = path.with_extension("json.tmp");
+    fs::write(&tmp, serde_json::to_string_pretty(cursor)? + "\n")?;
+    fs::rename(&tmp, path)?;
+    Ok(())
+}
+
 fn print_summary(key: &str, log: &ProjectLog) {
     let state = fold(&log.id, &log.events);
     let done = state
@@ -189,7 +200,7 @@ async fn main() -> Result<()> {
                     }
                 }
                 journal.append(&fresh)?;
-                fs::write(&cursor_path, serde_json::to_string_pretty(&cursor)? + "\n")?;
+                save_cursor(&cursor_path, &cursor)?;
                 for key in &touched {
                     print_summary(key, &projects[key]);
                 }
