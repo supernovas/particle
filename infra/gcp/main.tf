@@ -29,7 +29,7 @@ resource "google_service_account" "worker" {
 # scripts/gcp-upload-secrets.sh so key material never enters Terraform state;
 # here we only grant the worker's service account access to them.
 resource "google_secret_manager_secret_iam_member" "app_secrets" {
-  for_each  = toset(["particle-github-app-json", "particle-github-app-pem"])
+  for_each  = toset(["particle-github-app-json", "particle-github-app-pem", "particle-github-webhook-secret"])
   secret_id = each.value
   role      = "roles/secretmanager.secretAccessor"
   member    = "serviceAccount:${google_service_account.worker.email}"
